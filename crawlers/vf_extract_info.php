@@ -17,9 +17,9 @@
  */
 
 // These scripts are contained in the repository templates (in a separate Git)
-include('../templates/php/utilities/remote.php');
-include('../templates/php/utilities/utilities.php');
-include('utilities/config.php'); // configuration file, not included in Git
+include('../../templates/php/utilities/remote.php');
+include('../../templates/php/utilities/utilities.php');
+include('../utilities/config.php'); // configuration file, not included in Git
 
 $basic_url = "https://www.vesselfinder.com/vessels/";
 
