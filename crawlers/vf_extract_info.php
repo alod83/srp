@@ -63,6 +63,8 @@ if($qr != false && mysqli_num_rows($qr) > 0)
 			$spv = "";
 			for($i = 0; $i < count($pv); $i++)
 			{
+				if(strcmp($pn[$i],"Ship type") == 0)
+					$pn[$i] = "Type";
 				$spn .= "`".$pn[$i]."`,";
 				$spv .= "'".$pv[$i]."',";
 			}
