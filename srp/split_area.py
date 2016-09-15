@@ -4,7 +4,6 @@
 import mysql.connector as mysql
 import os
 import sys
-import LatLon
 
 geo_path = "../../templates/python/geo/"
 sys.path.append(os.path.abspath(geo_path))
@@ -36,10 +35,10 @@ cx = 0.1
 cy = 0.1
 
 insert_structure = ("INSERT INTO Malta_Grid "
-              "(MMSI, row, col, timestamp) "
-              "VALUES (%(mmsi)s, %(row)s, %(col)s, %(timestamp)s)")
+              "(MMSI, row, col, timestamp,name) "
+              "VALUES (%(mmsi)s, %(row)s, %(col)s, %(timestamp)s, %(name)s)")
 
-query = "SELECT MMSI,LATITUDE,LONGITUDE,TIMESTAMP FROM Malta"
+query = "SELECT MMSI,LATITUDE,LONGITUDE,TIMESTAMP,NAME FROM Malta"
 cursor = myquery(cnx,query)
 row = cursor.fetchone()
 while row is not None:
@@ -50,6 +49,7 @@ while row is not None:
     'row': str(x),
     'col': str(y),
     'timestamp': str(row[3]),
+    'name': str(row[4]),
     }
     
     ic = cnx.cursor(buffered=True)
