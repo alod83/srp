@@ -34,7 +34,7 @@ while row is not None:
     'eh': eh,
     }
     
-    iq = "INSERT INTO %(locality)s_Timestamp (MMSI, year, month, day,sh,eh) VALUES (%(mmsi)s, %(year)s, %(month)s, %(day)s, %(sh)s, %(eh)s)" %(data)
+    iq = "INSERT INTO %(locality)s_Timestamp (vessel_id, year, month, day,sh,eh) VALUES (%(mmsi)s, %(year)s, %(month)s, %(day)s, %(sh)s, %(eh)s)" %(data)
     ic = myquery(cnx,iq)
     ic.close()
     cnx.commit()
