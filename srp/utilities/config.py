@@ -22,3 +22,8 @@ def get_mysql():
 # This function parses the Grid section
 def get_grid():
     return get_param("Grid", {'cx', 'cy'})
+
+# This fucntion parses the training and test sections
+# type must be TrainingSet or TestSet
+def get_t_set(type):
+    return get_param(type, {'percentage', 'vessels'})
