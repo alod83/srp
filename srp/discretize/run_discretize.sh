@@ -8,4 +8,6 @@ echo "Run Discretization Module"
 python grid-timestamp.py
 # map speed over ground (sog) and course over ground (cog) to their associated tables
 python sog-cog.py
+# build patterns
+python pattern.py
 echo "End Discretization Module"

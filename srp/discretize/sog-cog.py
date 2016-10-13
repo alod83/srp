@@ -18,9 +18,10 @@ def populate(type):
         
         srows = SQLObj.get_type_ranges_from_locality(type, min,max)
         for srow in srows:
-            values = [srow['MMSI'],row['id']]
+            values = [srow['MMSI'],row['value']]
             SQLObj.set_type(values,type)
     return
 
 populate("Speed")
 populate("Course")
+SQLObj.close_cnx()

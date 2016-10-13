@@ -33,8 +33,8 @@ for row in rows:
         row['NAME']
     ]
     SQLObj.set_grid(values)
-    date = row['TIMESTAMP']
     
+    date = row['TIMESTAMP']
     # starting and end hours
     values = [
         row['MMSI'], 
@@ -45,4 +45,5 @@ for row in rows:
         (date.hour+1)%24   
     ]
     SQLObj.set_timestamp(values)
+SQLObj.close_cnx()
  
