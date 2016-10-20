@@ -20,8 +20,8 @@ def populate(type):
         for srow in srows:
             values = [srow['MMSI'],row['value']]
             SQLObj.set_type(values,type)
+    SQLObj.close_cnx()
     return
 
 populate("Speed")
 populate("Course")
-SQLObj.close_cnx()

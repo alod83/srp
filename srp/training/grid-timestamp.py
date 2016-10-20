@@ -1,7 +1,7 @@
 # This script transforms each coordinate (latitude, longitude) in a
 # position (row, column) in the grid
 
-import mysql.connector as mysql
+#import mysql.connector as mysql
 import os
 import sys
 config_path = "../utilities/"

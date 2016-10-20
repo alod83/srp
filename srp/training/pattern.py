@@ -1,4 +1,4 @@
-import mysql.connector as mysql
+#import mysql.connector as mysql
 import os
 import sys
 config_path = "../utilities/"

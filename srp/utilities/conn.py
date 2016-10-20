@@ -1,6 +1,7 @@
 import mysql.connector as mysql
 # load mysql parameters
 from config import get_mysql
+from config import get_t_set
 
 # TODO Remove limit 3 from queries.
 class MyConn:
@@ -16,19 +17,22 @@ class MyConn:
         'COURSE'
     ]
     
-    training_condition = "1 LIMIT 10"
+    
     
     # init object by opening a MySQL connection
     def __init__(self):
         mp = get_mysql()
         self.cnx = mysql.connect(user=mp['user'], password=mp['password'],database=mp['db'])
         self.locality = mp['locality']
+        trs = get_t_set("TrainingSet")
+        self.training_condition = "NAME IN (" + trs['vessels'] + ")"
     
     def select(self,table, fields, condition):
         query = "SELECT "
         for field in fields:
             query = query + field + ", "
         query = query[:-2] + " FROM " + table + " WHERE " + condition
+        #print query
         cursor = self.cnx.cursor(buffered=True)
         cursor.execute(query)
         return cursor
@@ -52,21 +56,24 @@ class MyConn:
     
     def get_min_max_from_type(self,type):
         fields = ['value','min','max']
-        cursor = self.select(type, fields, self.training_condition)
+        cursor = self.select(type, fields, "1")
         return self.cursor_to_list(cursor,fields)
     
     def get_type_ranges_from_locality(self,type,min,max):
         type = type.upper()
         fields = ['MMSI', type]
         data = {'type' : type, 'min' : min, 'max': max}
-        condition = "%(type)s >= '%(min)s' AND %(type)s < '%(max)s'" % (data)
+        condition = "%(type)s >= '%(min)s' AND %(type)s < '%(max)s' AND " % (data)
         cursor = self.select(self.locality,fields, condition + self.training_condition)
         return self.cursor_to_list(cursor,fields)
     
-    def get_pattern(self):
-        fields = ['pattern']
-        cursor = self.select(self.locality + "_Pattern", fields,"1")
+    def get_pattern(self,distinct=None):
+        fields = ['pattern','name','pattern_id']
+        if distinct is not None:
+            fields = ['distinct pattern_id']
+        cursor = self.select(self.locality + "_Pattern", fields,"1 ORDER BY timestamp ASC")
         return self.cursor_to_list(cursor,fields)
+    
     
     # fields is a string, vaules is a list of values
     def insert(self,table,fields,values):
@@ -82,7 +89,6 @@ class MyConn:
             'values'    : vs
         }
         query = "INSERT INTO %(locality)s_%(table)s (%(fields)s) VALUES (%(values)s)" %(data)
-        print query
         cursor = self.cnx.cursor(buffered=True)
         cursor.execute(query)
         cursor.close()
@@ -97,7 +103,6 @@ class MyConn:
             vs = vs + fn[i] + "='" + str(values[i+1]) + "',"
         #remove last comma
         vs = vs[:-1]
-        print vs
         affected_rows = self.update(table, vs,where)
         if affected_rows == 0:
             self.insert(table, "vessel_id," + fields, values)    
@@ -118,6 +123,17 @@ class MyConn:
         table = "Pattern"
         set = "pattern = CONCAT_WS('_', row, col,speed_id,course_id,sh)"
         self.update(table, set)
+        
+    def set_itemset(self,values):
+        table = "Itemset"
+        fields = "itemset_id,pattern_id"
+        self.insert(table, fields, values)
+        
+    def set_confidence(self,values):
+        table = "Confidence"
+        fields = "ant,cons,confidence"
+        self.insert(table,fields,values)
+    
              
     def update(self,table,set,where=None):
         if where == None:
@@ -130,13 +146,22 @@ class MyConn:
         }
         
         query = "UPDATE %(locality)s_%(table)s SET %(set)s WHERE %(where)s" %(data)
-        print query
         cursor = self.cnx.cursor(buffered=True)
         cursor.execute(query)
         self.cnx.commit()
         count = cursor.rowcount
         cursor.close()
         return count
+    
+    def count_items(self,ant,cons=None):
+        fields = ["COUNT(pattern_id)"]
+        condition = "pattern_id = '" + str(ant) + "'"
+        if cons is not None:
+            condition = condition + " AND itemset_id IN (SELECT itemset_id FROM " + self.locality + "_Itemset WHERE pattern_id = '" + str(cons) + "' )"
+        cursor = self.select(self.locality + "_Itemset", fields, condition)
+        row = cursor.fetchone()
+        return row[0]
+        
      
     def close_cnx(self):
         self.cnx.close()   
