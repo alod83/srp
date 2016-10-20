@@ -3,7 +3,7 @@
 -- http://www.phpmyadmin.net
 --
 -- Host: localhost
--- Creato il: Set 19, 2016 alle 12:03
+-- Creato il: Ott 20, 2016 alle 15:16
 -- Versione del server: 10.1.13-MariaDB
 -- Versione PHP: 5.5.35
 
@@ -23,27 +23,23 @@ SET time_zone = "+00:00";
 -- --------------------------------------------------------
 
 --
--- Struttura della tabella `Malta_Grid`
+-- Struttura della tabella `Malta_Pattern`
 --
 
-CREATE TABLE `Malta_Grid` (
-  `MMSI` int(11) NOT NULL,
+CREATE TABLE `Malta_Pattern` (
+  `pattern_id` int(11) NOT NULL,
+  `name` varchar(50) NOT NULL,
+  `pattern` varchar(100) NOT NULL,
+  `course_id` varchar(10) NOT NULL,
+  `speed_id` varchar(10) NOT NULL,
+  `vessel_id` int(11) NOT NULL,
+  `year` int(11) NOT NULL,
+  `month` int(11) NOT NULL,
+  `day` int(11) NOT NULL,
+  `sh` int(11) NOT NULL,
+  `eh` int(11) NOT NULL,
   `row` int(11) NOT NULL,
   `col` int(11) NOT NULL,
-  `timestamp` datetime NOT NULL,
-  `name` varchar(50) NOT NULL
+  `timestamp` datetime NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
---
--- Indici per le tabelle scaricate
---
-
---
--- Indici per le tabelle `Malta_Grid`
---
-ALTER TABLE `Malta_Grid`
-  ADD UNIQUE KEY `MMSI` (`MMSI`,`row`,`col`,`timestamp`);
-
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;

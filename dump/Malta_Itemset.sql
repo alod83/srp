@@ -3,7 +3,7 @@
 -- http://www.phpmyadmin.net
 --
 -- Host: localhost
--- Creato il: Set 19, 2016 alle 12:03
+-- Creato il: Ott 20, 2016 alle 11:26
 -- Versione del server: 10.1.13-MariaDB
 -- Versione PHP: 5.5.35
 
@@ -23,12 +23,12 @@ SET time_zone = "+00:00";
 -- --------------------------------------------------------
 
 --
--- Struttura della tabella `Malta_Speed`
+-- Struttura della tabella `Malta_Itemset`
 --
 
-CREATE TABLE `Malta_Speed` (
-  `vessel_id` varchar(50) NOT NULL,
-  `speed_id` int(11) NOT NULL
+CREATE TABLE `Malta_Itemset` (
+  `itemset_id` int(11) NOT NULL,
+  `pattern_id` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
