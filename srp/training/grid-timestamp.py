@@ -7,10 +7,6 @@ import sys
 config_path = "../utilities/"
 sys.path.append(os.path.abspath(config_path))
 
-
-# TODO move templates to utilities
-geo_path = "../../../templates/python/geo/"
-sys.path.append(os.path.abspath(geo_path))
 from geo import get_position_in_grid
 from conn import MyConn
 
