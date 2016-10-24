@@ -17,14 +17,17 @@ for row in rows:
         transactions[name].append(pattern)
     except KeyError:
         transactions[name] = [pattern]
-    
+
 transactions = [list(v) for k,v in transactions.items()]
 
 minsup = 10
 itemset_id = 1
+
 for itemset in find_frequent_itemsets(transactions, minsup):
+    print itemset
     for item in itemset:
         values = [itemset_id,item ]
+        print values
         SQLObj.set_itemset(values)
     itemset_id = itemset_id + 1
 SQLObj.close_cnx()
