@@ -1,7 +1,7 @@
 import mysql.connector as mysql
 # load mysql parameters
 from config import get_mysql
-from config import get_t_set
+from config import get_training_set
 
 # TODO Remove limit 3 from queries.
 class MyConn:
@@ -24,8 +24,8 @@ class MyConn:
         mp = get_mysql()
         self.cnx = mysql.connect(user=mp['user'], password=mp['password'],database=mp['db'])
         self.locality = mp['locality']
-        trs = get_t_set("TrainingSet")
-        self.training_condition = "NAME IN (" + trs['vessels'] + ")"
+        self.trs = get_training_set()
+        self.training_condition = "NAME IN (" + self.trs['vessels'] + ")"
     
     def select(self,table, fields, condition):
         query = "SELECT "
@@ -67,14 +67,37 @@ class MyConn:
         cursor = self.select(self.locality,fields, condition + self.training_condition)
         return self.cursor_to_list(cursor,fields)
     
-    def get_pattern(self,distinct=None):
+    def get_pattern(self,current_slot=None,distinct=None):
         fields = ['pattern','name','pattern_id']
         if distinct is not None:
             fields = ['distinct pattern_id']
-        cursor = self.select(self.locality + "_Pattern", fields,"1 ORDER BY timestamp ASC")
+        condition = "1 ORDER BY timestamp ASC"
+        if current_slot is not None:
+            end_slot = current_slot + int(self.trs['time_slot'])
+            condition = "sh >= " + str(current_slot) + " AND sh < " + str(end_slot) + " ORDER BY timestamp ASC"
+        cursor = self.select(self.locality + "_Pattern", fields,condition)
         return self.cursor_to_list(cursor,fields)
     
+    def get_pattern_id(self,pattern):
+        fields = ["pattern_id"]
+        # TODO do something if the pattern is not found
+        condition = "pattern = '" + pattern + "'"
+        cursor = self.select(self.locality + "_Pattern", fields,condition)
+        row = cursor.fetchone()
+        return row[0]
     
+    def get_confidence(self,ant):
+        fields = ["cons","confidence"]
+        condition = "ant = " + str(ant) + " AND confidence > 0"
+        cursor = self.select(self.locality + "_Confidence", fields,condition)
+        return self.cursor_to_list(cursor,fields)
+    
+    def get_support(self):
+        return int(self.trs['support'])
+    
+    def get_time_slot(self):
+        return int(self.trs['time_slot'])
+ 
     # fields is a string, vaules is a list of values
     def insert(self,table,fields,values):
         vs = ""
@@ -126,15 +149,14 @@ class MyConn:
         
     def set_itemset(self,values):
         table = "Itemset"
-        fields = "itemset_id,pattern_id"
+        fields = "itemset_id,pattern_id,slot"
         self.insert(table, fields, values)
         
     def set_confidence(self,values):
         table = "Confidence"
         fields = "ant,cons,confidence"
         self.insert(table,fields,values)
-    
-             
+     
     def update(self,table,set,where=None):
         if where == None:
             where = "1"
@@ -162,7 +184,13 @@ class MyConn:
         row = cursor.fetchone()
         return row[0]
         
-     
+    def convert_type_number_to_string(self,type,number):
+        fields = ['value']
+        condition = "min <= " + number + " AND max >= " + number
+        cursor = self.select(type, fields, condition)
+        row = cursor.fetchone()
+        return row[0]
+    
     def close_cnx(self):
         self.cnx.close()   
         

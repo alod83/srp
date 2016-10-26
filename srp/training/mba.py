@@ -7,7 +7,7 @@ sys.path.append(os.path.abspath(config_path))
 from conn import MyConn
 
 SQLObj = MyConn()
-patterns = SQLObj.get_pattern(True)
+patterns = SQLObj.get_pattern(distinct=True)
 confidence = 0
 for antl in patterns:
     ant = antl['distinct pattern_id']
@@ -19,5 +19,6 @@ for antl in patterns:
             # number of antecedents and consequents
             nac = SQLObj.count_items(ant,cons)
             confidence  = float(nac) / float(na) 
-        values = [ant,cons, confidence]
-        SQLObj.set_confidence(values) 
+        if confidence > 0:
+            values = [ant,cons, confidence]
+            SQLObj.set_confidence(values) 
