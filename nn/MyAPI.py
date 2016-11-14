@@ -51,26 +51,26 @@ class MyAPI:
         result = []
         row = cursor.fetchone()
         j = 0
-        minl = {}
-        maxl = {}
-        for i in fields:
-            minl[i] = 10000
-            maxl[i] = 0
+#         minl = {}
+#         maxl = {}
+#         for i in fields:
+#             minl[i] = 10000
+#             maxl[i] = 0
         
         while row is not None:
             result.insert(j, dict())
             
             for i in range(0,len(fields)):
-                d_row = float(row[i])
+                #d_row = float(row[i])
                 result[j][fields[i]] = row[i]
-                if d_row < minl[fields[i]]:
-                    minl[fields[i]] = d_row
-                if d_row > maxl[fields[i]]:
-                    maxl[fields[i]] = d_row
+#                 if d_row < minl[fields[i]]:
+#                     minl[fields[i]] = d_row
+#                 if d_row > maxl[fields[i]]:
+#                     maxl[fields[i]] = d_row
                 
             j = j + 1
             row = cursor.fetchone()
-        return result,minl,maxl
+        return result
     
     # get all fields from table 
     def get_all_from_locality(self):
@@ -125,7 +125,7 @@ class MyAPI:
             fields.append(feature)
         fields.append('NEXT_STATUS')
         cursor = self.select(self.locality, fields, "DATASET = 'TRAINING'")
-        rows,minl,maxl = self.cursor_to_list(cursor,fields)
+        rows = self.cursor_to_list(cursor,fields)
         
         X = []
         y = []
