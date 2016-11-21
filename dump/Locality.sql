@@ -3,7 +3,7 @@
 -- http://www.phpmyadmin.net
 --
 -- Host: localhost
--- Creato il: Set 19, 2016 alle 12:02
+-- Creato il: Nov 21, 2016 alle 15:30
 -- Versione del server: 10.1.13-MariaDB
 -- Versione PHP: 5.5.35
 
@@ -23,46 +23,45 @@ SET time_zone = "+00:00";
 -- --------------------------------------------------------
 
 --
--- Struttura della tabella `Speed`
+-- Struttura della tabella `Malta`
 --
 
-CREATE TABLE `Speed` (
-  `id` int(11) NOT NULL,
-  `value` varchar(10) NOT NULL,
-  `min` int(11) NOT NULL,
-  `max` int(11) NOT NULL
+CREATE TABLE `Malta` (
+  `vessel_id` int(11) NOT NULL,
+  `MMSI` int(11) NOT NULL,
+  `TIME` varchar(30) NOT NULL,
+  `TIMESTAMP` datetime DEFAULT NULL,
+  `LAT` varchar(30) NOT NULL,
+  `LON` varchar(30) NOT NULL,
+  `LATITUDE` decimal(18,15) NOT NULL,
+  `LONGITUDE` decimal(18,15) NOT NULL,
+  `NAME` varchar(50) NOT NULL,
+  `SPEED` decimal(10,2) NOT NULL,
+  `COURSE` decimal(10,2) NOT NULL,
+  `DATASET` enum('TRAINING','TEST','','') NOT NULL DEFAULT 'TRAINING',
+  `NEXT_STATUS` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
---
--- Dump dei dati per la tabella `Speed`
---
-
-INSERT INTO `Speed` (`id`, `value`, `min`, `max`) VALUES
-(1, 'Slow', 0, 3),
-(2, 'Medium', 3, 14),
-(3, 'High', 14, 23),
-(4, 'Very High', 23, 99),
-(5, 'Exception', 99, 10000);
 
 --
 -- Indici per le tabelle scaricate
 --
 
 --
--- Indici per le tabelle `Speed`
+-- Indici per le tabelle `Malta`
 --
-ALTER TABLE `Speed`
-  ADD PRIMARY KEY (`id`);
+ALTER TABLE `Malta`
+  ADD PRIMARY KEY (`vessel_id`),
+  ADD UNIQUE KEY `MMSI` (`MMSI`);
 
 --
 -- AUTO_INCREMENT per le tabelle scaricate
 --
 
 --
--- AUTO_INCREMENT per la tabella `Speed`
+-- AUTO_INCREMENT per la tabella `Malta`
 --
-ALTER TABLE `Speed`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+ALTER TABLE `Malta`
+  MODIFY `vessel_id` int(11) NOT NULL AUTO_INCREMENT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
