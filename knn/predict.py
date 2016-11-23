@@ -61,7 +61,7 @@ prob = knn.predict_proba(cstatus).tolist()
 
 result = {}
 for i in range(0,len(classes)):
-    result[classes[i]] = prob[0][i]
+    result[classes[i]] = float("{0:.2f}".format(prob[0][i]))
 
 #print json.dumps(prob)
 

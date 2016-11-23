@@ -154,7 +154,7 @@ class MyAPI:
                 nlat = float(next[0])
                 nlng = float(next[1])
                 [nx,ny] = get_position_in_grid(nlng, nlat, float(self.gp['cx']), float(self.gp['cy']))
-                y.append(str(ny) + "_" + str(nx))
+                y.append(str(int(ny)) + "_" + str(int(nx)))
         X = np.asarray(X)
         y = np.asarray(y)
         return X,y
