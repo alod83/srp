@@ -26,4 +26,4 @@ def get_grid():
 # This fucntion parses the training and test sections
 # type must be TrainingSet or TestSet
 def get_training_set():
-    return get_param("TrainingSet", {'percentage', 'vessels','support','time_slot','prediction_step'})
+    return get_param("TrainingSet", {'percentage', 'prediction_step'})

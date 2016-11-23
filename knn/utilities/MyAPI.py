@@ -37,6 +37,7 @@ class MyAPI:
         self.locality = mp['locality']
         self.trs = get_training_set()
         self.gp = get_grid()
+        self.next_status = "NEXT_STATUS_" + self.trs['prediction_step']
         
     def select(self,table, fields, condition):
         query = "SELECT "
@@ -78,34 +79,36 @@ class MyAPI:
         cursor = self.select(self.locality, self.lf, "1")
         return self.cursor_to_list(cursor,self.lf)
     
-    def build_datasets(self):
+    def build_datasets(self,extract_test=True):
         # split the dataset in training and test
         # calculate also the next step
         rows = self.get_all_from_locality()
-        p = self.trs['percentage']
+        nr = len(rows)   
+        il = []
+        if extract_test == True:
+            p = self.trs['percentage']
+            ne = nr - nr/100*int(p)      # number of extractions
+            
+            # build test set (as default, all values belong to the training set)
+            # list of indexes used for the training set
+            index = 0
+            for i in range(0,ne):
+                # extract a number until it is already contained in the il
+                while index in il:
+                    index = random.randint(0,nr-1)
+                il.append(index) 
+                nsi = self.get_next_status(rows[index]) # index of the next status
+                if nsi is None:
+                    nsi = -1
+                self.update(self.locality,"DATASET = 'TEST', " + self.next_status + " = " + str(nsi) , "vessel_id ='" + str(rows[index]['vessel_id']) + "'")    
         
-        nr = len(rows)               # number of rows
-        ne = nr - nr/100*int(p)      # number of extractions
-        
-        # build test set (as default, all values belong to the training set)
-        il = []         # list of indexes used for the training set
-        index = 0
-        for i in range(0,ne):
-            # extract a number until it is already contained in the il
-            while index in il:
-                index = random.randint(0,nr-1)
-            il.append(index) 
-            nsi = self.get_next_status(rows[index]) # index of the next status
-            if nsi is None:
-                nsi = -1
-            self.update(self.locality,"DATASET = 'TEST', NEXT_STATUS = " + str(nsi) , "vessel_id ='" + str(rows[index]['vessel_id']) + "'")    
         # update next status also for trainig set
         for i in range(0,nr):
             if i not in il:
                 nsi = self.get_next_status(rows[i])
                 if nsi is None:
                     nsi = -1
-                self.update(self.locality,"NEXT_STATUS = " + str(nsi) , "vessel_id ='" + str(rows[i]['vessel_id']) + "'")    
+                self.update(self.locality,self.next_status + " = " + str(nsi) , "vessel_id ='" + str(rows[i]['vessel_id']) + "'")    
          
     def get_next_status(self, row):
         name = row['NAME']
@@ -124,8 +127,8 @@ class MyAPI:
         fields = []
         for feature in self.features:
             fields.append(feature)
-        fields.append('NEXT_STATUS')
-        cursor = self.select(self.locality, fields, "DATASET = '" + type + "'")
+        fields.append(self.next_status)
+        cursor = self.select(self.locality, fields, "DATASET = '" + type + "' AND " + self.next_status + " != -1")
         rows = self.cursor_to_list(cursor,fields)
         
         X = []
@@ -134,7 +137,7 @@ class MyAPI:
         
         nf = ['LATITUDE', 'LONGITUDE']  # next fields
         for row in rows:
-            if row['NEXT_STATUS'] is not -1:
+            if row[self.next_status] is not -1:
                 f = []
                 for feature in self.features:
                     # feature scaling
@@ -143,7 +146,7 @@ class MyAPI:
                 X.append(f)
                     
                 # get next position
-                condition = "vessel_id = " + str(row['NEXT_STATUS'])
+                condition = "vessel_id = " + str(row[self.next_status])
                 cursor = self.select(self.locality, nf, condition)
                 next = cursor.fetchone()
                 #print row['NEXT_STATUS']
