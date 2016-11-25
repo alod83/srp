@@ -2,6 +2,7 @@ import psycopg2
 # load mysql parameters
 from config import get_mysql
 from config import get_training_set
+from config import get_features
 from geo import get_position_in_grid
 from config import get_grid
 import numpy as np
@@ -20,13 +21,17 @@ class MyAPI:
         'ST_Y (ST_Transform (geom, 4326))', # latitude
         'speed',
         'course',
+        'abs(b-a)', # length
+        'abs(d-c)'  # width
+        'basic_class',
     ]
     
     features = [
         'ST_Y (ST_Transform (geom, 4326))', 
         'ST_X (ST_Transform (geom, 4326))',
         'course', 
-        'speed'
+        'speed',
+        'basic_class'
     ]
     
     # init object by opening a MySQL connection
@@ -36,6 +41,7 @@ class MyAPI:
         self.table = mp['table']
         self.trs = get_training_set()
         self.gp = get_grid()
+        self.ft = get_features()
         self.next_status = "next_status_" + self.trs['prediction_step']
         
     def select(self,table, fields, condition):
@@ -69,7 +75,7 @@ class MyAPI:
         cursor = self.select(self.table, self.lf, "true")
         return self.cursor_to_list(cursor,self.lf)
     
-    def build_datasets(self,extract_test=True):
+    def build_datasets(self,extract_test=False):
         # split the dataset in training and test
         # calculate also the next step
         rows = self.get_all_from_table()
@@ -91,7 +97,11 @@ class MyAPI:
                 if nsi is None:
                     nsi = -1
                 # TESTSET -> dataset = false
-                self.update(self.table,"dataset = false, " + self.next_status + " = " + str(nsi) , "vessel_id ='" + str(rows[index]['vessel_id']) + "'")    
+                # is_small
+                length = rows[index]['abs(b-a)']
+                width = rows[index]['abs(d-c)']
+                bc = self.get_basic_class(length, width)
+                self.update(self.table,"is_training = false, " + self.next_status + " = " + str(nsi)  + ", basic_class = " + str(bc) , "vessel_id ='" + str(rows[index]['vessel_id']) + "'")    
         
         # update next status also for trainig set
         for i in range(0,nr):
@@ -99,8 +109,19 @@ class MyAPI:
                 nsi = self.get_next_status(rows[i])
                 if nsi is None:
                     nsi = -1
-                self.update(self.table,self.next_status + " = " + str(nsi) , "vessel_id ='" + str(rows[i]['vessel_id']) + "'")    
-         
+                length = float(rows[i]['abs(b-a)'])
+                width = float(rows[i]['abs(d-c)'])
+                bc = self.get_basic_class(length, width)
+                self.update(self.table,self.next_status + " = " + str(nsi) + ", basic_class = " + str(bc) , "vessel_id ='" + str(rows[i]['vessel_id']) + "'")    
+    
+    def get_basic_class(self, length, width):
+        if length <= float(self.ft['small_ship_length']) and width <= float(self.ft['small_ship_width']):
+            return 0 # small ship class 0
+        if length >= float(self.ft['big_ship_length']) and width >= float(self.ft['big_ship_width']):
+            return 2 # big ship class 2
+        return 1 # medium ship class 1
+        
+             
     def get_next_status(self, row):
         name = row['mmsi']
         ts = row['date_time']
@@ -119,7 +140,7 @@ class MyAPI:
         for feature in self.features:
             fields.append(feature)
         fields.append(self.next_status)
-        cursor = self.select(self.table, fields, "dataset = " + type + " AND " + self.next_status + " != -1")
+        cursor = self.select(self.table, fields, "is_training = " + type + " AND " + self.next_status + " != -1")
         rows = self.cursor_to_list(cursor,fields)
         
         X = []

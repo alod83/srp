@@ -30,7 +30,9 @@ parser.add_argument('-l', '--latitude', help='define current latitude',type=floa
 parser.add_argument('-n', '--longitude', help='define current longitude',type=float,required=True)
 parser.add_argument('-s', '--speed',help='define current speed',required=True)
 parser.add_argument('-c', '--course',help='define current course',required=True)
+parser.add_argument('-b', '--basic_class',help='define basic class (0 = small ship, 1 = medium ship, 2 = big ship)',required=True)
 parser.add_argument('-p', '--prediction_step',help='define prediction step',required=True)
+
 parser.add_argument('-o', '--output',help='specify output file name',required=False)
 
 args = parser.parse_args()
@@ -56,7 +58,8 @@ clng = float(args.longitude)
 cspeed = float(args.speed)
 ccourse_sin = math.sin(float(args.course))
 ccourse_cos = math.cos(float(args.course))
-cstatus = [[clat,clng,ccourse_sin,ccourse_cos,cspeed]]                    
+bc = int(args.basic_class)
+cstatus = [[clat,clng,ccourse_sin,ccourse_cos,cspeed, bc]]                    
 cstatus = robust_scaler.transform(cstatus)
 
 prob = knn.predict_proba(cstatus).tolist()

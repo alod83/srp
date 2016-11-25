@@ -27,3 +27,7 @@ def get_grid():
 # type must be TrainingSet or TestSet
 def get_training_set():
     return get_param("TrainingSet", {'percentage', 'prediction_step'})
+
+def get_features():
+    return get_param("Features", {'small_ship_length', 'small_ship_width', 'big_ship_length','big_ship_width'})
+
