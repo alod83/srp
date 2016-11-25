@@ -1,10 +1,11 @@
-import mysql.connector as mysql
+import psycopg2
 # load mysql parameters
 from config import get_mysql
 from config import get_training_set
 from geo import get_position_in_grid
 from config import get_grid
 import numpy as np
+import math
 
 import random
 
@@ -13,31 +14,29 @@ class MyAPI:
     
     lf = [
         'vessel_id',
-        'MMSI',
-        'TIME',
-        'TIMESTAMP',
-        'LATITUDE',
-        'LONGITUDE',
-        'NAME',
-        'SPEED',
-        'COURSE'
+        'mmsi',
+        'date_time',
+        'ST_X (ST_Transform (geom, 4326))', # longitude
+        'ST_Y (ST_Transform (geom, 4326))', # latitude
+        'speed',
+        'course',
     ]
     
     features = [
-        'LATITUDE', 
-        'LONGITUDE',
-        'COURSE', 
-        'SPEED'
+        'ST_Y (ST_Transform (geom, 4326))', 
+        'ST_X (ST_Transform (geom, 4326))',
+        'course', 
+        'speed'
     ]
     
     # init object by opening a MySQL connection
     def __init__(self):
         mp = get_mysql()
-        self.cnx = mysql.connect(user=mp['user'], password=mp['password'],database=mp['db'])
-        self.locality = mp['locality']
+        self.cnx = psycopg2.connect(user=mp['user'], password=mp['password'],database=mp['db'])
+        self.table = mp['table']
         self.trs = get_training_set()
         self.gp = get_grid()
-        self.next_status = "NEXT_STATUS_" + self.trs['prediction_step']
+        self.next_status = "next_status_" + self.trs['prediction_step']
         
     def select(self,table, fields, condition):
         query = "SELECT "
@@ -45,7 +44,8 @@ class MyAPI:
             query = query + field + ", "
         query = query[:-2] + " FROM " + table + " WHERE " + condition
         #print query
-        cursor = self.cnx.cursor(buffered=True)
+        #cursor = self.cnx.cursor(buffered=True)
+        cursor = self.cnx.cursor()
         cursor.execute(query)
         return cursor
     
@@ -53,36 +53,26 @@ class MyAPI:
         result = []
         row = cursor.fetchone()
         j = 0
-#         minl = {}
-#         maxl = {}
-#         for i in fields:
-#             minl[i] = 10000
-#             maxl[i] = 0
         
         while row is not None:
             result.insert(j, dict())
             
             for i in range(0,len(fields)):
-                #d_row = float(row[i])
                 result[j][fields[i]] = row[i]
-#                 if d_row < minl[fields[i]]:
-#                     minl[fields[i]] = d_row
-#                 if d_row > maxl[fields[i]]:
-#                     maxl[fields[i]] = d_row
                 
             j = j + 1
             row = cursor.fetchone()
         return result
     
     # get all fields from table 
-    def get_all_from_locality(self):
-        cursor = self.select(self.locality, self.lf, "1")
+    def get_all_from_table(self):
+        cursor = self.select(self.table, self.lf, "true")
         return self.cursor_to_list(cursor,self.lf)
     
     def build_datasets(self,extract_test=True):
         # split the dataset in training and test
         # calculate also the next step
-        rows = self.get_all_from_locality()
+        rows = self.get_all_from_table()
         nr = len(rows)   
         il = []
         if extract_test == True:
@@ -100,7 +90,8 @@ class MyAPI:
                 nsi = self.get_next_status(rows[index]) # index of the next status
                 if nsi is None:
                     nsi = -1
-                self.update(self.locality,"DATASET = 'TEST', " + self.next_status + " = " + str(nsi) , "vessel_id ='" + str(rows[index]['vessel_id']) + "'")    
+                # TESTSET -> dataset = false
+                self.update(self.table,"dataset = false, " + self.next_status + " = " + str(nsi) , "vessel_id ='" + str(rows[index]['vessel_id']) + "'")    
         
         # update next status also for trainig set
         for i in range(0,nr):
@@ -108,15 +99,15 @@ class MyAPI:
                 nsi = self.get_next_status(rows[i])
                 if nsi is None:
                     nsi = -1
-                self.update(self.locality,self.next_status + " = " + str(nsi) , "vessel_id ='" + str(rows[i]['vessel_id']) + "'")    
+                self.update(self.table,self.next_status + " = " + str(nsi) , "vessel_id ='" + str(rows[i]['vessel_id']) + "'")    
          
     def get_next_status(self, row):
-        name = row['NAME']
-        ts = row['TIMESTAMP']
-        sstep = self.trs['prediction_step']
-        estep = 2*int(sstep)
-        condition = "NAME = '" + row['NAME'] + "' AND TIMESTAMPDIFF(minute, '" + str(ts) + "', TIMESTAMP) >= " + sstep + " AND TIMESTAMPDIFF(minute, '" + str(ts) + "', TIMESTAMP) <= " + str(estep) + " ORDER BY TIMESTAMP ASC LIMIT 1" 
-        cursor = self.select(self.locality, self.lf, condition)
+        name = row['mmsi']
+        ts = row['date_time']
+        sstep = int(self.trs['prediction_step'])*60
+        estep = 2*sstep
+        condition = "mmsi = '" + row['mmsi'] + "' AND EXTRACT(EPOCH FROM (date_time - '" + str(ts) + "')) >= " + str(sstep) + " AND EXTRACT(EPOCH FROM (date_time - '" + str(ts) + "')) <= " + str(estep) + " ORDER BY date_time ASC LIMIT 1" 
+        cursor = self.select(self.table, self.lf, condition)
         next = cursor.fetchone()
         if next is None:
             return None
@@ -128,28 +119,30 @@ class MyAPI:
         for feature in self.features:
             fields.append(feature)
         fields.append(self.next_status)
-        cursor = self.select(self.locality, fields, "DATASET = '" + type + "' AND " + self.next_status + " != -1")
+        cursor = self.select(self.table, fields, "dataset = " + type + " AND " + self.next_status + " != -1")
         rows = self.cursor_to_list(cursor,fields)
         
         X = []
         y = []
         
-        
-        nf = ['LATITUDE', 'LONGITUDE']  # next fields
+        nf = ['ST_Y (ST_Transform (geom, 4326))', 'ST_X (ST_Transform (geom, 4326))']  # next fields
         for row in rows:
             if row[self.next_status] is not -1:
                 f = []
                 for feature in self.features:
-                    # feature scaling
-                    #value = (float(row[feature]) - minl[feature])/ (maxl[feature]-minl[feature])
-                    f.append(float(row[feature]))
+                    # if feature is course, modify it to use cos and sin
+                    if feature == 'course':
+                        f.append(math.sin(float(row[feature])))
+                        f.append(math.cos(float(row[feature])))
+                    else:    
+                        f.append(float(row[feature]))
                 X.append(f)
                     
                 # get next position
                 condition = "vessel_id = " + str(row[self.next_status])
-                cursor = self.select(self.locality, nf, condition)
+                cursor = self.select(self.table, nf, condition)
                 next = cursor.fetchone()
-                #print row['NEXT_STATUS']
+                #print row['next_status']
                 #print next
                 nlat = float(next[0])
                 nlng = float(next[1])
@@ -173,12 +166,11 @@ class MyAPI:
         #remove last comma
         vs = vs[:-1]
         data = {
-            'locality'  : self.locality,
-            'table'     : table,
+            'table'     : self.table,
             'fields'    : fields,
             'values'    : vs
         }
-        query = "INSERT INTO %(locality)s_%(table)s (%(fields)s) VALUES (%(values)s)" %(data)
+        query = "INSERT INTO %(table)s (%(fields)s) VALUES (%(values)s)" %(data)
         cursor = self.cnx.cursor(buffered=True)
         cursor.execute(query)
         cursor.close()
@@ -194,7 +186,7 @@ class MyAPI:
         }
         
         query = "UPDATE %(table)s SET %(set)s WHERE %(where)s" %(data)
-        cursor = self.cnx.cursor(buffered=True)
+        cursor = self.cnx.cursor()
         cursor.execute(query)
         self.cnx.commit()
         count = cursor.rowcount

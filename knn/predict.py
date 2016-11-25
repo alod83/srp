@@ -1,10 +1,11 @@
-#!/Library/Frameworks/Python.framework/Versions/2.7/bin/python
+#!/usr/bin/python
 
 # This script predicts the grid of probabilities
 from sklearn.preprocessing import RobustScaler
 from sklearn.neighbors import KNeighborsClassifier
 import numpy as np
 import json
+import math
 from sklearn.externals import joblib
 
 import os
@@ -53,8 +54,9 @@ classes = joblib.load('data/classes-' + ps + '.pkl')
 clat = float(args.latitude)
 clng = float(args.longitude)
 cspeed = float(args.speed)
-ccourse = float(args.course)
-cstatus = [[clat,clng,ccourse,cspeed]]                    
+ccourse_sin = math.sin(float(args.course))
+ccourse_cos = math.cos(float(args.course))
+cstatus = [[clat,clng,ccourse_sin,ccourse_cos,cspeed]]                    
 cstatus = robust_scaler.transform(cstatus)
 
 prob = knn.predict_proba(cstatus).tolist()

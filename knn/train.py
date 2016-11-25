@@ -15,8 +15,8 @@ from MyAPI import MyAPI
 
 # Create training and test data
 api = MyAPI()
-X_train, Y_train = api.get_dataset('TRAINING') 
-X_test, Y_test = api.get_dataset('TEST')
+X_train, Y_train = api.get_dataset('true') # training
+X_test, Y_test = api.get_dataset('false')
 
 # prediction step
 ps = api.get_prediction_step()

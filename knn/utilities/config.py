@@ -17,7 +17,7 @@ def get_param(section, list):
 
 # This function parses the MySQL section
 def get_mysql():
-    return get_param("MySQL", {'user', 'password', 'db', 'locality'})
+    return get_param("SQL", {'user', 'password', 'db', 'table'})
 
 # This function parses the Grid section
 def get_grid():
