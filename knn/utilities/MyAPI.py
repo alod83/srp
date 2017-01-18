@@ -20,19 +20,21 @@ class MyAPI:
         'ST_X (ST_Transform (geom, 4326))', # longitude
         'ST_Y (ST_Transform (geom, 4326))', # latitude
         'speed',
-        'course',
-        'abs(b-a)', # length
-        'abs(d-c)'  # width
+        'heading',
+        'abs(b+a)', # length
+        'abs(d+c)',  # width
         'basic_class',
     ]
     
     features = [
         'ST_Y (ST_Transform (geom, 4326))', 
         'ST_X (ST_Transform (geom, 4326))',
-        'course', 
+        'heading', 
         'speed',
         'basic_class'
     ]
+    
+    burst = 10000
     
     # init object by opening a MySQL connection
     def __init__(self):
@@ -71,20 +73,27 @@ class MyAPI:
         return result
     
     # get all fields from table 
-    def get_all_from_table(self):
-        cursor = self.select(self.table, self.lf, "true")
+    def get_all_from_table(self,condition=False):
+        if condition is False:
+            condition = "true"
+        cursor = self.select(self.table, self.lf, condition)
         return self.cursor_to_list(cursor,self.lf)
     
-    def build_datasets(self,extract_test=False):
+    def build_datasets(self,extract_test=False, start_index=False, end_index=False,continue_from_previous_run=False):
         # split the dataset in training and test
         # calculate also the next step
-        rows = self.get_all_from_table()
-        nr = len(rows)   
+        condition = "true"
+        if start_index is not False and end_index is not False:
+            condition = "vessel_id >= " + str(start_index) + " and vessel_id <= " + str(end_index)
+        if continue_from_previous_run == True:
+            condition = condition + " and " + self.next_status + " == -1"
+        rows = self.get_all_from_table(condition)
+        nr = len(rows) 
         il = []
         if extract_test == True:
+            #self.set_all_training(condition)
             p = self.trs['percentage']
-            ne = nr - nr/100*int(p)      # number of extractions
-            
+            ne = int(nr - float(nr)/100*int(p))     # number of extractions
             # build test set (as default, all values belong to the training set)
             # list of indexes used for the training set
             index = 0
@@ -98,35 +107,42 @@ class MyAPI:
                     nsi = -1
                 # TESTSET -> dataset = false
                 # is_small
-                length = rows[index]['abs(b-a)']
-                width = rows[index]['abs(d-c)']
+                length = rows[index]['abs(b+a)']
+                width = rows[index]['abs(d+c)']
                 bc = self.get_basic_class(length, width)
-                self.update(self.table,"is_training = false, " + self.next_status + " = " + str(nsi)  + ", basic_class = " + str(bc) , "vessel_id ='" + str(rows[index]['vessel_id']) + "'")    
+                self.update(self.table,"is_training = false, " + self.next_status + " = " + str(nsi)  + ", basic_class = " + str(bc) , "vessel_id = " + str(rows[index]['vessel_id']) + "")    
         
         # update next status also for trainig set
+        bc = 0
         for i in range(0,nr):
             if i not in il:
                 nsi = self.get_next_status(rows[i])
                 if nsi is None:
                     nsi = -1
-                length = float(rows[i]['abs(b-a)'])
-                width = float(rows[i]['abs(d-c)'])
-                bc = self.get_basic_class(length, width)
-                self.update(self.table,self.next_status + " = " + str(nsi) + ", basic_class = " + str(bc) , "vessel_id ='" + str(rows[i]['vessel_id']) + "'")    
+                if rows[i]['abs(b+a)'] is None:
+                    bc = -1
+                else:
+                    length = float(rows[i]['abs(b+a)'])
+                    width = float(rows[i]['abs(d+c)'])
+                    bc = self.get_basic_class(length, width)
+                self.update(self.table, self.next_status + " = " + str(nsi) + ", basic_class = " + str(bc) , "vessel_id =" + str(rows[i]['vessel_id']) + "")    
     
     def get_basic_class(self, length, width):
-        if length <= float(self.ft['small_ship_length']) and width <= float(self.ft['small_ship_width']):
+        if length <= float(self.ft['small_ship_length']):
             return 0 # small ship class 0
-        if length >= float(self.ft['big_ship_length']) and width >= float(self.ft['big_ship_width']):
-            return 2 # big ship class 2
-        return 1 # medium ship class 1
+        if length >= float(self.ft['big_ship_length']):
+            return 1 # big ship class 2
+        return 2 # medium ship class 1
         
              
     def get_next_status(self, row):
         name = row['mmsi']
         ts = row['date_time']
-        sstep = int(self.trs['prediction_step'])*60
-        estep = 2*sstep
+        ps = int(self.trs['prediction_step'])*60
+        epsilon = ps/3
+        sstep = ps - epsilon
+        estep = ps + epsilon
+    
         condition = "mmsi = '" + row['mmsi'] + "' AND EXTRACT(EPOCH FROM (date_time - '" + str(ts) + "')) >= " + str(sstep) + " AND EXTRACT(EPOCH FROM (date_time - '" + str(ts) + "')) <= " + str(estep) + " ORDER BY date_time ASC LIMIT 1" 
         cursor = self.select(self.table, self.lf, condition)
         next = cursor.fetchone()
@@ -134,13 +150,17 @@ class MyAPI:
             return None
         return next[0]    
     
-    def get_dataset(self,type):
+    def get_dataset(self,type,start_index=False,end_index=False):
         # return a x and y
         fields = []
         for feature in self.features:
             fields.append(feature)
         fields.append(self.next_status)
-        cursor = self.select(self.table, fields, "is_training = " + type + " AND " + self.next_status + " != -1")
+        condition = "is_training = " + type + " AND " + self.next_status + " != -1"
+        if start_index is not False and end_index is not False:
+            condition = condition + " AND vessel_id >= " + str(start_index) + " and vessel_id < " + str(end_index)
+        
+        cursor = self.select(self.table, fields, condition)
         rows = self.cursor_to_list(cursor,fields)
         
         X = []
@@ -148,11 +168,11 @@ class MyAPI:
         
         nf = ['ST_Y (ST_Transform (geom, 4326))', 'ST_X (ST_Transform (geom, 4326))']  # next fields
         for row in rows:
-            if row[self.next_status] is not -1:
+            if row[self.next_status] is not -1 and row[self.next_status] is not 0:
                 f = []
                 for feature in self.features:
                     # if feature is course, modify it to use cos and sin
-                    if feature == 'course':
+                    if feature == 'heading':
                         f.append(math.sin(float(row[feature])))
                         f.append(math.cos(float(row[feature])))
                     else:    
@@ -207,6 +227,7 @@ class MyAPI:
         }
         
         query = "UPDATE %(table)s SET %(set)s WHERE %(where)s" %(data)
+        #print query
         cursor = self.cnx.cursor()
         cursor.execute(query)
         self.cnx.commit()
@@ -214,6 +235,12 @@ class MyAPI:
         cursor.close()
         return count
      
+    def set_all_training(self,where):
+        set = "is_training = true"
+        self.update(self.table,set,where)
+        
+    def get_n_features(self):
+        return len(self.features)
     
     def close_cnx(self):
         self.cnx.close()   

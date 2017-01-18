@@ -29,7 +29,7 @@ parser = argparse.ArgumentParser(description='Ship Route Preditction')
 parser.add_argument('-l', '--latitude', help='define current latitude',type=float,required=True)
 parser.add_argument('-n', '--longitude', help='define current longitude',type=float,required=True)
 parser.add_argument('-s', '--speed',help='define current speed',required=True)
-parser.add_argument('-c', '--course',help='define current course',required=True)
+parser.add_argument('-c', '--heading',help='define current heading',required=True)
 parser.add_argument('-b', '--basic_class',help='define basic class (0 = small ship, 1 = medium ship, 2 = big ship)',required=True)
 parser.add_argument('-p', '--prediction_step',help='define prediction step',required=True)
 
@@ -56,10 +56,11 @@ classes = joblib.load('data/classes-' + ps + '.pkl')
 clat = float(args.latitude)
 clng = float(args.longitude)
 cspeed = float(args.speed)
-ccourse_sin = math.sin(float(args.course))
-ccourse_cos = math.cos(float(args.course))
+cheading_sin = math.sin(float(args.heading))
+cheading_cos = math.cos(float(args.heading))
 bc = int(args.basic_class)
-cstatus = [[clat,clng,ccourse_sin,ccourse_cos,cspeed, bc]]                    
+cstatus = [[clat,clng,cheading_sin,cheading_cos,cspeed, bc]] 
+                  
 cstatus = robust_scaler.transform(cstatus)
 
 prob = knn.predict_proba(cstatus).tolist()
@@ -79,3 +80,6 @@ if args.output is None:
 else:
     with open(args.output, 'wb') as fh:
         fh.write(result)
+
+#print knn.predict(cstatus)
+#print get_position_in_grid(clng,clat,0.1,0.1)

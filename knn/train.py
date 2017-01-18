@@ -12,11 +12,40 @@ import sys
 config_path = "utilities/"
 sys.path.append(os.path.abspath(config_path))
 from MyAPI import MyAPI
+from utilities import concatenate
 
 # Create training and test data
 api = MyAPI()
-X_train, Y_train = api.get_dataset('true') # training
-X_test, Y_test = api.get_dataset('false')
+burst = 20000
+# number of records. Calculated offline for performance reasons
+nr = 500000
+start_index = 0
+end_index = start_index + burst
+X_train = []
+Y_train = []
+X_test = []
+Y_test = []
+while end_index <= nr:
+    print "start index: " + str(start_index) + " end index: " + str(end_index)
+    X_train_temp, Y_train_temp = api.get_dataset('true',start_index=start_index,end_index=end_index) # training
+    X_test_temp, Y_test_temp = api.get_dataset('false',start_index=start_index,end_index=end_index)
+    #print len(X_train_temp[0])
+    X_train = concatenate(X_train,X_train_temp)
+    #print len(X_train[0])
+    #print len(Y_train)
+    Y_train = concatenate(Y_train,Y_train_temp)
+    #print len(X_test)
+    X_test = concatenate(X_test,X_test_temp)
+    #print len(Y_train)
+    Y_test = concatenate(Y_test,Y_test_temp)
+    
+    start_index = end_index + 1
+    end_index = start_index + burst - 1
+    if end_index > nr:
+        end_index = nr
+    if start_index > nr:
+        end_index = nr+1
+
 
 # prediction step
 ps = api.get_prediction_step()
