@@ -44,14 +44,15 @@ class MyAPI:
         self.trs = get_training_set()
         self.gp = get_grid()
         self.ft = get_features()
-        self.next_status = "next_status_" + self.trs['prediction_step']
+        # TODO correct prediction_steps
+        self.next_status = "next_status_" + str(self.trs['prediction_steps'][0])
         
     def select(self,table, fields, condition):
         query = "SELECT "
         for field in fields:
             query = query + field + ", "
         query = query[:-2] + " FROM " + table + " WHERE " + condition
-        #print query
+        print query
         #cursor = self.cnx.cursor(buffered=True)
         cursor = self.cnx.cursor()
         cursor.execute(query)
@@ -138,12 +139,15 @@ class MyAPI:
     def get_next_status(self, row):
         name = row['mmsi']
         ts = row['date_time']
-        ps = int(self.trs['prediction_step'])*60
+        ps = int(self.trs['prediction_steps'])*60
         epsilon = ps/3
         sstep = ps - epsilon
         estep = ps + epsilon
     
-        condition = "mmsi = '" + row['mmsi'] + "' AND EXTRACT(EPOCH FROM (date_time - '" + str(ts) + "')) >= " + str(sstep) + " AND EXTRACT(EPOCH FROM (date_time - '" + str(ts) + "')) <= " + str(estep) + " ORDER BY date_time ASC LIMIT 1" 
+        # do not choose the first one (ORDER BY date_time ASC) but the nearest to the prediction step 
+        #condition = "mmsi = '" + row['mmsi'] + "' AND EXTRACT(EPOCH FROM (date_time - '" + str(ts) + "')) >= " + str(sstep) + " AND EXTRACT(EPOCH FROM (date_time - '" + str(ts) + "')) <= " + str(estep) + " ORDER BY date_time ASC LIMIT 1" 
+        condition = "mmsi = '" + row['mmsi'] + "' AND EXTRACT(EPOCH FROM (date_time - '" + str(ts) + "')) >= " + str(sstep) + " AND EXTRACT(EPOCH FROM (date_time - '" + str(ts) + "')) <= " + str(estep) + " ORDER BY  abs(EXTRACT(EPOCH FROM (date_time - (timestamp '" + str(ts) + "' + interval '" + str(ps) + " seconds')))) ASC LIMIT 1" 
+        
         cursor = self.select(self.table, self.lf, condition)
         next = cursor.fetchone()
         if next is None:
@@ -193,8 +197,8 @@ class MyAPI:
         y = np.asarray(y)
         return X,y
     
-    def get_prediction_step(self):
-        return int(self.trs['prediction_step'])
+    def get_prediction_steps(self):
+        return self.trs['prediction_steps']
     
     def get_time_slot(self):
         return int(self.trs['time_slot'])

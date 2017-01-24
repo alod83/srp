@@ -7,15 +7,18 @@ import numpy as np
 import json
 import math
 from sklearn.externals import joblib
+from geojson import Feature, Polygon, FeatureCollection, dumps
 
 import os
 import sys
 from scipy.odr.odrpack import Output
+from matplotlib.backends.backend_ps import ps_backend_helper
 config_path = "utilities/"
 sys.path.append(os.path.abspath(config_path))
 
 from geo import get_position_in_grid
 from config import get_grid
+from config import get_training_set
 from MyAPI import MyAPI
 from numpy.distutils.misc_util import cxx_ext_match
 import json
@@ -31,7 +34,7 @@ parser.add_argument('-n', '--longitude', help='define current longitude',type=fl
 parser.add_argument('-s', '--speed',help='define current speed',required=True)
 parser.add_argument('-c', '--heading',help='define current heading',required=True)
 parser.add_argument('-b', '--basic_class',help='define basic class (0 = small ship, 1 = medium ship, 2 = big ship)',required=True)
-parser.add_argument('-p', '--prediction_step',help='define prediction step',required=True)
+#parser.add_argument('-p', '--prediction_step',help='define prediction step',required=True)
 
 parser.add_argument('-o', '--output',help='specify output file name',required=False)
 
@@ -40,17 +43,10 @@ args = parser.parse_args()
 api = MyAPI()
 # prediction step
 # TODO manage prediction step
-ps = args.prediction_step
+#ps = args.prediction_steps
+tp = get_training_set()
+
 gp = get_grid()
-
-# restore classifier set from file
-knn = joblib.load('data/knn-' + ps + '.pkl') 
-
-# restore robust scaler from file
-robust_scaler = joblib.load('data/rs-' + ps + '.pkl') 
-
-# restore classes from file
-classes = joblib.load('data/classes-' + ps + '.pkl') 
 
 # current position
 clat = float(args.latitude)
@@ -60,21 +56,51 @@ cheading_sin = math.sin(float(args.heading))
 cheading_cos = math.cos(float(args.heading))
 bc = int(args.basic_class)
 cstatus = [[clat,clng,cheading_sin,cheading_cos,cspeed, bc]] 
-                  
-cstatus = robust_scaler.transform(cstatus)
 
-prob = knn.predict_proba(cstatus).tolist()
-
-result = {}
-for i in range(0,len(classes)):
-    result[classes[i]] = float("{0:.2f}".format(prob[0][i]))
-
+prop = {}
+psl = tp['prediction_steps']
+features = []
+for ps in psl:
+    ps = str(ps)
+    
+    #prop['probability_' + ps] = []
+    #prop['class_' + ps] = []
+    # restore classifier set from file
+    knn = joblib.load('data/knn-' + ps + '.pkl') 
+    
+    # restore robust scaler from file
+    robust_scaler = joblib.load('data/rs-' + ps + '.pkl') 
+    
+    # restore classes from file
+    classes = joblib.load('data/classes-' + ps + '.pkl') 
+    cstatus = robust_scaler.transform(cstatus)
+    prob = knn.predict_proba(cstatus).tolist()
+    
+    for i in range(0,len(classes)):
+        nz_prob = float("{0:.2f}".format(prob[0][i]))
+        if nz_prob > 0:
+            try:
+               prop[classes[i]]['probability_' + ps] = nz_prob
+            except KeyError:
+                prop[classes[i]] = {}
+                prop[classes[i]]['probability_' + ps] = nz_prob
+            
+            
+for key in prop:
+    # TO DO build polygon
+    pol = Polygon([[(2.38, 57.322), (23.194, -20.28), (-120.43, 19.15), (2.38, 57.322)]])
+    features.insert(i,Feature(geometry=pol,properties=prop[key]))
+# build the output in geojson
+#result = {}
+#for i in range(0,len(classes)):
+#    result[classes[i]] = float("{0:.2f}".format(prob[0][i]))
+  
 #print json.dumps(prob)
-
+result = FeatureCollection(features)
 #sys.stdout.write(json.dumps(prob))
 #sys.stdout.flush()
 
-result = json.dumps(result)
+result = dumps(result)
 if args.output is None:
     print result
 else:

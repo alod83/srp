@@ -26,7 +26,13 @@ def get_grid():
 # This fucntion parses the training and test sections
 # type must be TrainingSet or TestSet
 def get_training_set():
-    return get_param("TrainingSet", {'percentage', 'prediction_step'})
+    param = get_param("TrainingSet", {'percentage', 'prediction_steps'})
+    ps = param['prediction_steps'].split(',')
+    for i in range(0,len(ps)):
+        ps[i] = int(ps[i])
+    param['prediction_steps'] = ps
+    return param
+    
 
 def get_features():
     return get_param("Features", {'small_ship_length', 'small_ship_width', 'big_ship_length','big_ship_width'})
