@@ -14,7 +14,7 @@ import random
 class MyAPI:
     
     lf = [
-        'vessel_id',
+        'record_id',
         'mmsi',
         'date_time',
         'ST_X (ST_Transform (geom, 4326))', # longitude
@@ -45,14 +45,19 @@ class MyAPI:
         self.gp = get_grid()
         self.ft = get_features()
         # TODO correct prediction_steps
-        self.next_status = "next_status_" + str(self.trs['prediction_steps'][0])
+        self.next_status = []
+        self.ps = []
+        print self.trs['prediction_steps'][0]
+        for i in range(0,len(self.trs['prediction_steps'])):
+            self.ps.insert(i,str(self.trs['prediction_steps'][i]))
+            self.next_status.insert(i,"next_status_" + self.ps[i])
         
     def select(self,table, fields, condition):
         query = "SELECT "
         for field in fields:
             query = query + field + ", "
         query = query[:-2] + " FROM " + table + " WHERE " + condition
-        print query
+        #print query
         #cursor = self.cnx.cursor(buffered=True)
         cursor = self.cnx.cursor()
         cursor.execute(query)
@@ -83,51 +88,52 @@ class MyAPI:
     def build_datasets(self,extract_test=False, start_index=False, end_index=False,continue_from_previous_run=False):
         # split the dataset in training and test
         # calculate also the next step
-        condition = "true"
-        if start_index is not False and end_index is not False:
-            condition = "vessel_id >= " + str(start_index) + " and vessel_id <= " + str(end_index)
-        if continue_from_previous_run == True:
-            condition = condition + " and " + self.next_status + " == -1"
-        rows = self.get_all_from_table(condition)
-        nr = len(rows) 
-        il = []
-        if extract_test == True:
-            #self.set_all_training(condition)
-            p = self.trs['percentage']
-            ne = int(nr - float(nr)/100*int(p))     # number of extractions
-            # build test set (as default, all values belong to the training set)
-            # list of indexes used for the training set
-            index = 0
-            for i in range(0,ne):
-                # extract a number until it is already contained in the il
-                while index in il:
-                    index = random.randint(0,nr-1)
-                il.append(index) 
-                nsi = self.get_next_status(rows[index]) # index of the next status
-                if nsi is None:
-                    nsi = -1
-                # TESTSET -> dataset = false
-                # is_small
-                length = rows[index]['abs(b+a)']
-                width = rows[index]['abs(d+c)']
-                bc = self.get_basic_class(length, width)
-                self.update(self.table,"is_training = false, " + self.next_status + " = " + str(nsi)  + ", basic_class = " + str(bc) , "vessel_id = " + str(rows[index]['vessel_id']) + "")    
-        
-        # update next status also for trainig set
-        bc = 0
-        for i in range(0,nr):
-            if i not in il:
-                nsi = self.get_next_status(rows[i])
-                if nsi is None:
-                    nsi = -1
-                if rows[i]['abs(b+a)'] is None:
-                    bc = -1
-                else:
-                    length = float(rows[i]['abs(b+a)'])
-                    width = float(rows[i]['abs(d+c)'])
+        for cps in range(0,len(self.ps)):
+            condition = "true"
+            if start_index is not False and end_index is not False:
+                condition = "record_id >= " + str(start_index) + " and record_id <= " + str(end_index)
+            if continue_from_previous_run == True:
+                condition = condition + " and " + self.next_status[cps] + " == -1"
+            rows = self.get_all_from_table(condition)
+            nr = len(rows) 
+            il = []
+            if extract_test == True:
+                #self.set_all_training(condition)
+                p = self.trs['percentage']
+                ne = int(nr - float(nr)/100*int(p))     # number of extractions
+                # build test set (as default, all values belong to the training set)
+                # list of indexes used for the training set
+                index = 0
+                for i in range(0,ne):
+                    # extract a number until it is already contained in the il
+                    while index in il:
+                        index = random.randint(0,nr-1)
+                    il.append(index) 
+                    nsi = self.get_next_status(rows[index],self.ps[cps]) # index of the next status
+                    if nsi is None:
+                        nsi = -1
+                    # TESTSET -> dataset = false
+                    # is_small
+                    length = rows[index]['abs(b+a)']
+                    width = rows[index]['abs(d+c)']
                     bc = self.get_basic_class(length, width)
-                self.update(self.table, self.next_status + " = " + str(nsi) + ", basic_class = " + str(bc) , "vessel_id =" + str(rows[i]['vessel_id']) + "")    
-    
+                    self.update(self.table,"is_training = false, " + self.next_status[cps] + " = " + str(nsi)  + ", basic_class = " + str(bc) , "record_id = " + str(rows[index]['record_id']) + "")    
+            
+            # update next status also for trainig set
+            bc = 0
+            for i in range(0,nr):
+                if i not in il:
+                    nsi = self.get_next_status(rows[i],self.ps[cps])
+                    if nsi is None:
+                        nsi = -1
+                    if rows[i]['abs(b+a)'] is None:
+                        bc = -1
+                    else:
+                        length = float(rows[i]['abs(b+a)'])
+                        width = float(rows[i]['abs(d+c)'])
+                        bc = self.get_basic_class(length, width)
+                    self.update(self.table, self.next_status[cps] + " = " + str(nsi) + ", basic_class = " + str(bc) , "record_id =" + str(rows[i]['record_id']) + "")    
+        
     def get_basic_class(self, length, width):
         if length <= float(self.ft['small_ship_length']):
             return 0 # small ship class 0
@@ -136,10 +142,10 @@ class MyAPI:
         return 2 # medium ship class 1
         
              
-    def get_next_status(self, row):
+    def get_next_status(self, row,ps):
         name = row['mmsi']
         ts = row['date_time']
-        ps = int(self.trs['prediction_steps'])*60
+        ps = int(ps)*60
         epsilon = ps/3
         sstep = ps - epsilon
         estep = ps + epsilon
@@ -162,7 +168,7 @@ class MyAPI:
         fields.append(self.next_status)
         condition = "is_training = " + type + " AND " + self.next_status + " != -1"
         if start_index is not False and end_index is not False:
-            condition = condition + " AND vessel_id >= " + str(start_index) + " and vessel_id < " + str(end_index)
+            condition = condition + " AND record_id >= " + str(start_index) + " and record_id < " + str(end_index)
         
         cursor = self.select(self.table, fields, condition)
         rows = self.cursor_to_list(cursor,fields)
@@ -184,7 +190,7 @@ class MyAPI:
                 X.append(f)
                     
                 # get next position
-                condition = "vessel_id = " + str(row[self.next_status])
+                condition = "record_id = " + str(row[self.next_status])
                 cursor = self.select(self.table, nf, condition)
                 next = cursor.fetchone()
                 #print row['next_status']
