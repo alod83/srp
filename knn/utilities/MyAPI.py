@@ -47,7 +47,6 @@ class MyAPI:
         # TODO correct prediction_steps
         self.next_status = []
         self.ps = []
-        print self.trs['prediction_steps'][0]
         for i in range(0,len(self.trs['prediction_steps'])):
             self.ps.insert(i,str(self.trs['prediction_steps'][i]))
             self.next_status.insert(i,"next_status_" + self.ps[i])
@@ -160,13 +159,13 @@ class MyAPI:
             return None
         return next[0]    
     
-    def get_dataset(self,type,start_index=False,end_index=False):
+    def get_dataset(self,type,psi,start_index=False,end_index=False):
         # return a x and y
         fields = []
         for feature in self.features:
             fields.append(feature)
-        fields.append(self.next_status)
-        condition = "is_training = " + type + " AND " + self.next_status + " != -1"
+        fields.append(self.next_status[psi])
+        condition = "is_training = " + type + " AND " + self.next_status[psi] + " != -1"
         if start_index is not False and end_index is not False:
             condition = condition + " AND record_id >= " + str(start_index) + " and record_id < " + str(end_index)
         
@@ -178,7 +177,7 @@ class MyAPI:
         
         nf = ['ST_Y (ST_Transform (geom, 4326))', 'ST_X (ST_Transform (geom, 4326))']  # next fields
         for row in rows:
-            if row[self.next_status] is not -1 and row[self.next_status] is not 0:
+            if row[self.next_status[psi]] is not -1 and row[self.next_status[psi]] is not 0:
                 f = []
                 for feature in self.features:
                     # if feature is course, modify it to use cos and sin
@@ -190,7 +189,7 @@ class MyAPI:
                 X.append(f)
                     
                 # get next position
-                condition = "record_id = " + str(row[self.next_status])
+                condition = "record_id = " + str(row[self.next_status[psi]])
                 cursor = self.select(self.table, nf, condition)
                 next = cursor.fetchone()
                 #print row['next_status']
