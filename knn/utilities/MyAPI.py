@@ -95,44 +95,44 @@ class MyAPI:
                 condition = condition + " and " + self.next_status[cps] + " == -1"
             rows = self.get_all_from_table(condition)
             nr = len(rows) 
-            il = []
-            if extract_test == True:
-                #self.set_all_training(condition)
-                p = self.trs['percentage']
-                ne = int(nr - float(nr)/100*int(p))     # number of extractions
-                # build test set (as default, all values belong to the training set)
-                # list of indexes used for the training set
-                index = 0
-                for i in range(0,ne):
-                    # extract a number until it is already contained in the il
-                    while index in il:
-                        index = random.randint(0,nr-1)
-                    il.append(index) 
-                    nsi = self.get_next_status(rows[index],self.ps[cps]) # index of the next status
-                    if nsi is None:
-                        nsi = -1
-                    # TESTSET -> dataset = false
-                    # is_small
-                    length = rows[index]['abs(b+a)']
-                    width = rows[index]['abs(d+c)']
-                    bc = self.get_basic_class(length, width)
-                    self.update(self.table,"is_training = false, " + self.next_status[cps] + " = " + str(nsi)  + ", basic_class = " + str(bc) , "record_id = " + str(rows[index]['record_id']) + "")    
-            
+#            il = []
+#             if extract_test == True:
+#                 #self.set_all_training(condition)
+#                 p = self.trs['percentage']
+#                 ne = int(nr - float(nr)/100*int(p))     # number of extractions
+#                 # build test set (as default, all values belong to the training set)
+#                 # list of indexes used for the training set
+#                 index = 0
+#                 for i in range(0,ne):
+#                     # extract a number until it is already contained in the il
+#                     while index in il:
+#                         index = random.randint(0,nr-1)
+#                     il.append(index) 
+#                     nsi = self.get_next_status(rows[index],self.ps[cps]) # index of the next status
+#                     if nsi is None:
+#                         nsi = -1
+#                     # TESTSET -> dataset = false
+#                     # is_small
+#                     length = rows[index]['abs(b+a)']
+#                     width = rows[index]['abs(d+c)']
+#                     bc = self.get_basic_class(length, width)
+#                     self.update(self.table,"is_training = false, " + self.next_status[cps] + " = " + str(nsi)  + ", basic_class = " + str(bc) , "record_id = " + str(rows[index]['record_id']) + "")    
+#             
             # update next status also for trainig set
             bc = 0
             for i in range(0,nr):
-                if i not in il:
-                    nsi = self.get_next_status(rows[i],self.ps[cps])
-                    if nsi is None:
-                        nsi = -1
-                    if rows[i]['abs(b+a)'] is None:
-                        bc = -1
-                    else:
-                        length = float(rows[i]['abs(b+a)'])
-                        width = float(rows[i]['abs(d+c)'])
-                        bc = self.get_basic_class(length, width)
-                    self.update(self.table, self.next_status[cps] + " = " + str(nsi) + ", basic_class = " + str(bc) , "record_id =" + str(rows[i]['record_id']) + "")    
-        
+                #if i not in il:
+                nsi = self.get_next_status(rows[i],self.ps[cps])
+                if nsi is None:
+                    nsi = -1
+                if rows[i]['abs(b+a)'] is None:
+                    bc = -1
+                else:
+                    length = float(rows[i]['abs(b+a)'])
+                    width = float(rows[i]['abs(d+c)'])
+                    bc = self.get_basic_class(length, width)
+                self.update(self.table, self.next_status[cps] + " = " + str(nsi) + ", basic_class = " + str(bc) , "record_id =" + str(rows[i]['record_id']) + "")    
+    
     def get_basic_class(self, length, width):
         if length <= float(self.ft['small_ship_length']):
             return 0 # small ship class 0
@@ -159,22 +159,65 @@ class MyAPI:
             return None
         return next[0]    
     
-    def get_dataset(self,type,psi,start_index=False,end_index=False):
+#     def get_dataset(self,type,psi,start_index=False,end_index=False):
+#         # return a x and y
+#         fields = []
+#         for feature in self.features:
+#             fields.append(feature)
+#         fields.append(self.next_status[psi])
+#         condition = "is_training = " + type + " AND " + self.next_status[psi] + " != -1"
+#         if start_index is not False and end_index is not False:
+#             condition = condition + " AND record_id >= " + str(start_index) + " and record_id < " + str(end_index)
+#         
+#         cursor = self.select(self.table, fields, condition)
+#         rows = self.cursor_to_list(cursor,fields)
+#         
+#         X = []
+#         y = []
+#         
+#         nf = ['ST_Y (ST_Transform (geom, 4326))', 'ST_X (ST_Transform (geom, 4326))']  # next fields
+#         for row in rows:
+#             if row[self.next_status[psi]] is not -1 and row[self.next_status[psi]] is not 0:
+#                 f = []
+#                 for feature in self.features:
+#                     # if feature is course, modify it to use cos and sin
+#                     if feature == 'heading':
+#                         f.append(math.sin(float(row[feature])))
+#                         f.append(math.cos(float(row[feature])))
+#                     else:    
+#                         f.append(float(row[feature]))
+#                 X.append(f)
+#                     
+#                 # get next position
+#                 condition = "record_id = " + str(row[self.next_status[psi]])
+#                 cursor = self.select(self.table, nf, condition)
+#                 next = cursor.fetchone()
+#                 #print row['next_status']
+#                 #print next
+#                 nlat = float(next[0])
+#                 nlng = float(next[1])
+#                 [nx,ny] = get_position_in_grid(nlng, nlat, float(self.gp['cx']), float(self.gp['cy']))
+#                 y.append(str(int(ny)) + "_" + str(int(nx)))
+#         X = np.asarray(X)
+#         y = np.asarray(y)
+#         return X,y
+    
+    def get_dataset(self,psi,start_index=False,end_index=False):
         # return a x and y
         fields = []
         for feature in self.features:
             fields.append(feature)
         fields.append(self.next_status[psi])
-        condition = "is_training = " + type + " AND " + self.next_status[psi] + " != -1"
+        condition = self.next_status[psi] + " != -1"
         if start_index is not False and end_index is not False:
             condition = condition + " AND record_id >= " + str(start_index) + " and record_id < " + str(end_index)
-        
+         
         cursor = self.select(self.table, fields, condition)
         rows = self.cursor_to_list(cursor,fields)
-        
+         
         X = []
         y = []
-        
+         
         nf = ['ST_Y (ST_Transform (geom, 4326))', 'ST_X (ST_Transform (geom, 4326))']  # next fields
         for row in rows:
             if row[self.next_status[psi]] is not -1 and row[self.next_status[psi]] is not 0:
@@ -187,7 +230,7 @@ class MyAPI:
                     else:    
                         f.append(float(row[feature]))
                 X.append(f)
-                    
+                     
                 # get next position
                 condition = "record_id = " + str(row[self.next_status[psi]])
                 cursor = self.select(self.table, nf, condition)

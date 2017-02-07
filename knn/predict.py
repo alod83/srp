@@ -78,12 +78,18 @@ for ps in psl:
     
     for i in range(0,len(classes)):
         nz_prob = float("{0:.2f}".format(prob[0][i]))
+
         if nz_prob > 0:
             try:
                prop[classes[i]]['probability_' + ps] = nz_prob
+               prop[classes[i]]['row'] = int(coord[0])
+               prop[classes[i]]['column'] = int(coord[1])
             except KeyError:
                 prop[classes[i]] = {}
                 prop[classes[i]]['probability_' + ps] = nz_prob
+                coord = classes[i].split("_")
+                prop[classes[i]]['row'] = int(coord[0])
+                prop[classes[i]]['column'] = int(coord[1])
             
             
 for key in prop:
