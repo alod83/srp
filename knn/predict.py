@@ -17,6 +17,7 @@ config_path = "utilities/"
 sys.path.append(os.path.abspath(config_path))
 
 from geo import get_position_in_grid
+from geo import get_polygon
 from config import get_grid
 from config import get_training_set
 from MyAPI import MyAPI
@@ -58,6 +59,7 @@ bc = int(args.basic_class)
 cstatus = [[clat,clng,cheading_sin,cheading_cos,cspeed, bc]] 
 
 prop = {}
+polygons = {}
 psl = tp['prediction_steps']
 features = []
 for ps in psl:
@@ -80,6 +82,9 @@ for ps in psl:
         nz_prob = float("{0:.2f}".format(prob[0][i]))
 
         if nz_prob > 0:
+            coord = classes[i].split("_")
+            polygons[classes[i]] = get_polygon(int(coord[1]),int(coord[0]),float(gp['cx']),float(gp['cy']))
+           
             try:
                prop[classes[i]]['probability_' + ps] = nz_prob
                prop[classes[i]]['row'] = int(coord[0])
@@ -87,15 +92,15 @@ for ps in psl:
             except KeyError:
                 prop[classes[i]] = {}
                 prop[classes[i]]['probability_' + ps] = nz_prob
-                coord = classes[i].split("_")
                 prop[classes[i]]['row'] = int(coord[0])
                 prop[classes[i]]['column'] = int(coord[1])
             
             
 for key in prop:
     # TO DO build polygon
-    pol = Polygon([[(2.38, 57.322), (23.194, -20.28), (-120.43, 19.15), (2.38, 57.322)]])
-    features.insert(i,Feature(geometry=pol,properties=prop[key]))
+    #pol = Polygon([[(2.38, 57.322), (23.194, -20.28), (-120.43, 19.15), (2.38, 57.322)]])
+    pol = Polygon(polygons[key])
+    features.append(Feature(geometry=pol,properties=prop[key]))
 # build the output in geojson
 #result = {}
 #for i in range(0,len(classes)):
@@ -114,4 +119,5 @@ else:
         fh.write(result)
 
 #print knn.predict(cstatus)
-#print get_position_in_grid(clng,clat,0.1,0.1)
+#pos = get_position_in_grid(clng,clat,0.1,0.1)
+#print get_polygon(pos[0], pos[1], 0.1,0.1)

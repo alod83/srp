@@ -20,3 +20,21 @@ def get_position_in_grid(x, y, cx, cy):
     xg = get_position(x,cx,"lng")
     yg = get_position(y,cy,"lat")
     return np.array([xg, yg])
+
+def get_points(x, cx):
+    if cx > 0:
+        #if type == "lng":
+        #    return [float("{0:.2f}".format(x*cx)),float("{0:.2f}".format((x+1)*cx)) ]
+        #else:
+        return [float("{0:.2f}".format(x*cx)),float("{0:.2f}".format((x+1)*cx)) ]
+
+def get_polygon(x,y,cx,cy):
+    by = get_points(y,cy)
+    bx = get_points(x,cx)
+    return [[
+            (bx[0],by[0]), 
+            (bx[1],by[1]), 
+            (bx[1],by[0]), 
+            (bx[0],by[1]), 
+            (bx[0],by[0])
+        ]]
