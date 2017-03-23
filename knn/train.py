@@ -1,12 +1,25 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.preprocessing import RobustScaler
+from sklearn.model_selection import GridSearchCV
+
+# classifiers
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.multiclass import OneVsOneClassifier
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.svm import LinearSVC
+from sklearn.naive_bayes import GaussianNB
+from sklearn.naive_bayes import BernoulliNB
+from sklearn import tree
+from sklearn import svm
+from sklearn.neural_network import MLPClassifier
+
 from sklearn.metrics import precision_score
 from sklearn.metrics import recall_score
 from sklearn.model_selection import train_test_split
 import dill
 from sklearn.externals import joblib
+import os.path
 
 import os
 import sys
@@ -15,13 +28,70 @@ sys.path.append(os.path.abspath(config_path))
 from MyAPI import MyAPI
 from utilities import concatenate
 
-# Create training and test data
+import argparse
+
+parser = argparse.ArgumentParser(description='Train')
+parser.add_argument('-a', '--algorithm', help='algorithm (knn, one-vs-one, one-vs-rest,gaussian-nb,bernoulli-nb,decision-tree,svm,linear-svm,mlp)',required=False)
+parser.add_argument('-c', '--cross_validation', action='store_true',help='enable cross validation',required=False)
+args = parser.parse_args()
+
+algorithm = "knn"
+if args.algorithm is not None:
+    algorithm = args.algorithm
+
+# cross validation
+cv = False
+if args.cross_validation:
+    cv = True
+
+
+classifier = None
+parameters = None
+# best estimator file
 api = MyAPI()
+exists_be_file = None
+ps = api.get_prediction_steps()
+# check whether the cross validation was already run
+be_file = 'data/best-estimator-' + algorithm + '-' + str(ps[0]) + ".pkl"
+exists_be_file = os.path.exists(be_file)
+
+cv_classifier = []
+if exists_be_file is True and cv is False:
+    for psi in range(0,len(ps)):
+        cv_classifier.append(joblib.load(be_file))
+    print "exists_be_file" + str(exists_be_file)
+elif algorithm == 'knn':
+    classifier = KNeighborsClassifier(weights='distance',n_neighbors=3)
+elif algorithm == 'one-vs-one':
+    classifier = OneVsOneClassifier(LinearSVC(random_state=0))
+elif algorithm == 'one-vs-rest':
+    classifier = OneVsRestClassifier(LinearSVC(random_state=0)) 
+# gaussian naive bayes
+elif algorithm == 'gaussian-nb':
+    classifier = GaussianNB()   
+# bernoulli naive bayes
+elif algorithm == 'bernoulli-nb':
+    classifier = BernoulliNB()
+elif algorithm == 'decision-tree':
+    classifier = tree.DecisionTreeClassifier()
+elif algorithm == 'svm':
+    classifier = svm.SVC(decision_function_shape='ovo')
+elif algorithm == 'linear-svm':
+    classifier = svm.LinearSVC()
+elif algorithm == 'mlp':
+    classifier = MLPClassifier(solver='lbfgs', alpha=1e-5,hidden_layer_sizes=(5, 2), random_state=1)
+    if cv:
+        parameters = {'alpha'   : [1e-5], 
+              'solver'          : ['lbfgs', 'sgd', 'adam'],
+              'activation'      : ['identity', 'logistic', 'tanh', 'relu'],
+              'learning_rate'   : ['constant', 'invscaling', 'adaptive']
+        }
+        
+
 burst = 100
 # number of records. Calculated offline for performance reasons
-nr = 10000
+nr = 600
 
-ps = api.get_prediction_steps()
 for psi in range(0,len(ps)):
     print ps[psi]
     start_index = 0
@@ -58,34 +128,47 @@ for psi in range(0,len(ps)):
     X_train = robust_scaler.fit_transform(X_train)
     
     # save robust scaler
-    joblib.dump(robust_scaler, 'data/rs-' + str(ps[psi]) + '.pkl')    
+    joblib.dump(robust_scaler, 'data/rs-' + algorithm + '-' + str(ps[psi]) + '.pkl')    
     
     X_test = robust_scaler.transform(X_test)
     
-    # Classify using k-NN
-    knn = KNeighborsClassifier(weights='distance',n_neighbors=3)
-    knn.fit(X_train, Y_train)
     
-    #save classifier 
-    joblib.dump(knn, 'data/knn-' + str(ps[psi]) + '.pkl')  
+    if classifier is not None or exists_be_file is True:
+        
+        if cv is True:
+            gs = GridSearchCV(classifier, parameters)
+            gs.fit(X_train, Y_train)
+            classifier = gs.best_estimator_
+            # save best estimator
+            joblib.dump(gs.best_estimator_, 'data/best-estimator-' + algorithm + '-' + str(ps[psi]) + '.pkl')   
+        elif exists_be_file is True:
+            classifier = cv_classifier[psi]
+            
+        classifier.fit(X_train, Y_train)
+        # Classify using k-NN
+        #knn = KNeighborsClassifier(weights='distance',n_neighbors=3)
+        #knn.fit(X_train, Y_train)
     
-    # store classes
-    ordered_y = sorted(set(Y_train))
-    joblib.dump(ordered_y, 'data/classes-' + str(ps[psi]) + '.pkl')    
+        #save classifier 
+        joblib.dump(classifier, 'data/' + algorithm + '-' + str(ps[psi]) + '.pkl')  
+    
+        # store classes
+        ordered_y = sorted(set(Y_train))
+        joblib.dump(ordered_y, 'data/classes-' + algorithm + '-' + str(ps[psi]) + '.pkl')    
       
     
-    accuracy = knn.score(X_test, Y_test)
-    Y_pred = knn.predict(X_test)
-      
-    out_file = open("data/test-" + str(ps[psi]) + '.txt',"w")
-    
-    out_file.write(str(ps[psi]) + " Precision macro: %1.3f" % precision_score(Y_test, Y_pred,average='macro') + "\n")
-    out_file.write(str(ps[psi]) + " Precision micro: %1.3f" % precision_score(Y_test, Y_pred,average='micro') + "\n")
-    out_file.write(str(ps[psi]) + " Precision weighted: %1.3f" % precision_score(Y_test, Y_pred,average='weighted') + "\n")
-     
-    out_file.write(str(ps[psi]) + " Recall macro: %1.3f" % recall_score(Y_test, Y_pred, average='macro') + "\n")
-    out_file.write(str(ps[psi]) + " Recall micro: %1.3f" % recall_score(Y_test, Y_pred, average='micro') + "\n")
-    out_file.write(str(ps[psi]) + " Recall weighted: %1.3f" % recall_score(Y_test, Y_pred, average='weighted') + "\n")
-    
-    out_file.write("Accuracy:   %.3f" % accuracy  + "\n")
-    out_file.close()
+        accuracy = classifier.score(X_test, Y_test)
+        Y_pred = classifier.predict(X_test)
+          
+        out_file = open("data/test-" + algorithm + '-' + str(ps[psi]) + '.txt',"w")
+        
+        out_file.write(str(ps[psi]) + " Precision macro: %1.3f" % precision_score(Y_test, Y_pred,average='macro') + "\n")
+        out_file.write(str(ps[psi]) + " Precision micro: %1.3f" % precision_score(Y_test, Y_pred,average='micro') + "\n")
+        out_file.write(str(ps[psi]) + " Precision weighted: %1.3f" % precision_score(Y_test, Y_pred,average='weighted') + "\n")
+         
+        out_file.write(str(ps[psi]) + " Recall macro: %1.3f" % recall_score(Y_test, Y_pred, average='macro') + "\n")
+        out_file.write(str(ps[psi]) + " Recall micro: %1.3f" % recall_score(Y_test, Y_pred, average='micro') + "\n")
+        out_file.write(str(ps[psi]) + " Recall weighted: %1.3f" % recall_score(Y_test, Y_pred, average='weighted') + "\n")
+        
+        out_file.write("Accuracy:   %.3f" % accuracy  + "\n")
+        out_file.close()

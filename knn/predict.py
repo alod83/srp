@@ -71,10 +71,10 @@ for ps in psl:
     knn = joblib.load('data/knn-' + ps + '.pkl') 
     
     # restore robust scaler from file
-    robust_scaler = joblib.load('data/rs-' + ps + '.pkl') 
+    robust_scaler = joblib.load('data/rs-knn' + ps + '.pkl') 
     
     # restore classes from file
-    classes = joblib.load('data/classes-' + ps + '.pkl') 
+    classes = joblib.load('data/classes-knn' + ps + '.pkl') 
     cstatus = robust_scaler.transform(cstatus)
     prob = knn.predict_proba(cstatus).tolist()
     
