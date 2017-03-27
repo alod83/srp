@@ -5,6 +5,7 @@ from sklearn.model_selection import GridSearchCV
 
 # classifiers
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neighbors import RadiusNeighborsClassifier
 from sklearn.multiclass import OneVsOneClassifier
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.svm import LinearSVC
@@ -13,6 +14,8 @@ from sklearn.naive_bayes import BernoulliNB
 from sklearn import tree
 from sklearn import svm
 from sklearn.neural_network import MLPClassifier
+from sklearn.linear_model import SGDClassifier
+from sklearn.kernel_approximation import RBFSampler
 
 from sklearn.metrics import precision_score
 from sklearn.metrics import recall_score
@@ -31,7 +34,7 @@ from utilities import concatenate
 import argparse
 
 parser = argparse.ArgumentParser(description='Train')
-parser.add_argument('-a', '--algorithm', help='algorithm (knn, one-vs-one, one-vs-rest,gaussian-nb,bernoulli-nb,decision-tree,svm,linear-svm,mlp)',required=False)
+parser.add_argument('-a', '--algorithm', help='algorithm (knn, one-vs-one, one-vs-rest,gaussian-nb,bernoulli-nb,decision-tree,svm,linear-svm,mlp,radius-neighbor,sgd,kernel-approx)',required=False)
 parser.add_argument('-c', '--cross_validation', action='store_true',help='enable cross validation',required=False)
 args = parser.parse_args()
 
@@ -62,32 +65,69 @@ if exists_be_file is True and cv is False:
     print "exists_be_file" + str(exists_be_file)
 elif algorithm == 'knn':
     classifier = KNeighborsClassifier(weights='distance',n_neighbors=3)
+    if cv:
+        parameters = {  'n_neighbors'   : np.arange(3, 8),
+                        'weights'       : ['uniform', 'distance'],
+                        'algorithm'     : ['auto', 'ball_tree', 'kd_tree', 'brute'],
+                        'leaf_size'     : np.arange(30,50)
+                    }
 elif algorithm == 'one-vs-one':
     classifier = OneVsOneClassifier(LinearSVC(random_state=0))
+    if cv:
+        parameters = {  'estimator'   : [LinearSVC(random_state=0), svm.LinearSVC()]}
 elif algorithm == 'one-vs-rest':
     classifier = OneVsRestClassifier(LinearSVC(random_state=0)) 
+    if cv:
+        parameters = {  'estimator'   : [LinearSVC(random_state=0), svm.LinearSVC()]}
 # gaussian naive bayes
 elif algorithm == 'gaussian-nb':
-    classifier = GaussianNB()   
+    classifier = GaussianNB()  
+    if cv:
+        parameters = {}
 # bernoulli naive bayes
 elif algorithm == 'bernoulli-nb':
     classifier = BernoulliNB()
+    if cv:
+        parameters = {  'alpha'       : 0.1 * np.arange(0, 10)}
 elif algorithm == 'decision-tree':
     classifier = tree.DecisionTreeClassifier()
+    if cv:
+        parameters = {  'criterion'   : ['gini', 'entropy'],
+                        'splitter'    : ['best', 'random']
+                    }
 elif algorithm == 'svm':
     classifier = svm.SVC(decision_function_shape='ovo')
+    if cv:
+        parameters = {  'kernel'                    : [ 'poly', 'rbf', 'sigmoid'],
+                        'decision_function_shape'   : ['ovo', 'ovr', 'None']
+                    }
 elif algorithm == 'linear-svm':
     classifier = svm.LinearSVC()
+    if cv:
+        parameters = {  'loss'      : ['hinge', 'squared_hinge']}
 elif algorithm == 'mlp':
     classifier = MLPClassifier(solver='lbfgs', alpha=1e-5,hidden_layer_sizes=(5, 2), random_state=1)
     if cv:
         parameters = {'alpha'   : [1e-5], 
-              'solver'          : ['lbfgs', 'sgd', 'adam'],
-              'activation'      : ['identity', 'logistic', 'tanh', 'relu'],
-              'learning_rate'   : ['constant', 'invscaling', 'adaptive']
+                      'solver'          : ['lbfgs', 'sgd', 'adam'],
+                      'activation'      : ['identity', 'logistic', 'tanh', 'relu'],
+                      'learning_rate'   : ['constant', 'invscaling', 'adaptive']
+                }
+elif algorithm == 'radius-neighbor':
+    classifier = RadiusNeighborsClassifier(radius=100.0)  
+    if cv:
+        parameters = { 'weights'         : ['uniform', 'distance'],
+                       'algorithm'       : ['auto', 'ball_tree', 'kd_tree', 'brute']
+        }     
+elif algorithm == 'sgd' or algorithm == 'kernel-approx':
+    classifier = SGDClassifier(loss="hinge", penalty="l2")
+    if cv:
+        parameters = { 'loss'           : ['hinge', 'log', 'modified_huber', 'squared_hinge', 'perceptron'],
+                       'penalty'        : ['none', 'l2', 'l1', 'elasticnet'],
+                      'alpha'           : 10.0 ** -np.arange(1, 5)
+                      #'learning_rate'   : ['constant', 'optimal', 'invscaling']
         }
-        
-
+    
 burst = 100
 # number of records. Calculated offline for performance reasons
 nr = 600
@@ -132,13 +172,18 @@ for psi in range(0,len(ps)):
     
     X_test = robust_scaler.transform(X_test)
     
-    
+    if algorithm == 'kernel-approx':
+        rbf_feature = RBFSampler(gamma=1, random_state=1)
+        X_train = rbf_feature.fit_transform(X_train)
+        X_test = rbf_feature.fit_transform(X_test)
+        
     if classifier is not None or exists_be_file is True:
         
         if cv is True:
             gs = GridSearchCV(classifier, parameters)
             gs.fit(X_train, Y_train)
             classifier = gs.best_estimator_
+            print(gs.best_estimator_)
             # save best estimator
             joblib.dump(gs.best_estimator_, 'data/best-estimator-' + algorithm + '-' + str(ps[psi]) + '.pkl')   
         elif exists_be_file is True:
@@ -154,6 +199,8 @@ for psi in range(0,len(ps)):
     
         # store classes
         ordered_y = sorted(set(Y_train))
+        
+        
         joblib.dump(ordered_y, 'data/classes-' + algorithm + '-' + str(ps[psi]) + '.pkl')    
       
     
