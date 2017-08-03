@@ -1,0 +1,23 @@
+[SQL]
+user = postgres
+password = 
+db = dati_ais2
+table = srp_dataset
+
+[Grid]
+# configuration parameters to set up the grid
+# cell size
+cx = 0.1
+cy = 0.1
+
+[TrainingSet]
+percentage = 80
+# prediction steps separated by comma and without spaces (e.g. 30,45,60)
+prediction_steps = 30,45,60
+
+[Features]
+#length and width of ships in meters
+small_ship_length = 50 
+small_ship_width = 6 # 6-8
+big_ship_length = 51
+big_ship_width = 15
