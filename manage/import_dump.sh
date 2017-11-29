@@ -3,9 +3,9 @@
 echo "* * * * * Import Dump * * * * *"
 
 user="postgres"
-export PGPASSWORD='osiProj16'
-db_name="dati_ais2"
-db_link="http://osiris.sister.it/db_dump/osiris.zip"
+export PGPASSWORD=''
+db_name=""
+db_link=""
 
 # TODO read from url, use wget
 usage() { echo "Usage: $0 [-f <path to file>][-w]" 1>&2; exit 1; }
