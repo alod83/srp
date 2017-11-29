@@ -5,3 +5,10 @@ def concatenate(x1,x2):
         return x2
     else:
         return np.concatenate((x1, x2), axis=0)
+        
+def print_result(output,result):
+	if output is None:
+		print result
+	else:
+		with open(output, 'ab') as fh:
+			fh.write(result)

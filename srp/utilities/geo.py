@@ -33,8 +33,8 @@ def get_polygon(x,y,cx,cy):
     bx = get_points(x,cx)
     return [[
             (bx[0],by[0]), 
-            (bx[1],by[1]), 
-            (bx[1],by[0]), 
             (bx[0],by[1]), 
+            (bx[1],by[1]),
+            (bx[1],by[0]),
             (bx[0],by[0])
         ]]

@@ -4,7 +4,7 @@ from ConfigParser import ConfigParser
 
 def init_config():
     config = ConfigParser()
-    config.read("../config.ini")
+    config.read("/home/angelica/Git/osiris/config.ini")
     return config
 
 # Generic function to retrieve parameters

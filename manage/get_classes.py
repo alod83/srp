@@ -34,12 +34,14 @@ sns.set(color_codes=True)
 import argparse
 parser = argparse.ArgumentParser(description='Train')
 parser.add_argument('-n', '--number', help='number of records',required=True)
+args = parser.parse_args()
+nr = int(args.number)
 
 np.random.seed(sum(map(ord, "distributions")))
 
 import os
 import sys
-config_path = "utilities/"
+config_path = "/home/angelica/Git/osiris/srp/utilities/"
 sys.path.append(os.path.abspath(config_path))
 
 from MyAPI import MyAPI
@@ -54,7 +56,7 @@ Y = []
 #nr = 4051656
 #nr = 430000
 #nr = 7744019
-nr = int(args.number)
+
 while end_index <= nr:
     X_temp, Y_temp = api.get_dataset(0, start_index=start_index,end_index=end_index, nr=nr)
     if len(X_temp) > 0:

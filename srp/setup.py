@@ -1,6 +1,6 @@
 import os
 import sys
-config_path = "utilities/"
+config_path = "/home/angelica/Git/osiris/srp/utilities/"
 sys.path.append(os.path.abspath(config_path))
 from MyAPI import MyAPI
 import argparse

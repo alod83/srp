@@ -16,9 +16,17 @@ if(isset($_GET['latitude']) &&
 	$bc = $_GET['basic_class'];
 	$algorithm = isset($_GET['algorithm']) ? $_GET['algorithm'] : 'knn';
 	$output = "";
-	exec("$python_env predict.py -l $lat -n $lng -c $heading -s $sog -b $bc -a $algorithm", $output);
+	exec("$python_env predict.py -a $algorithm features -l $lat -n $lng -c $heading -s $sog -b $bc", $output);
 	echo $output[0];
 }
-else 
-	echo "Parameters: latitude, longitude, sog, heading, basic_class, algorithm (optional, default is knn)";
+else if (isset($_GET['record_id']))
+{
+	$algorithm = isset($_GET['algorithm']) ? $_GET['algorithm'] : 'knn';
+	$output = "";
+	$record_id = $_GET['record_id'];
+	exec("$python_env predict.py -a $algorithm record_id -r $record_id", $output);
+	echo $output[0];
+}
+else
+	echo "Parameters: latitude, longitude, sog, heading, basic_class, algorithm, record_id (optional, default is knn)";
 ?>

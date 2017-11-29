@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.preprocessing import RobustScaler
+from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import GridSearchCV
 
 # classifiers
@@ -22,11 +23,13 @@ from sklearn.metrics import recall_score
 from sklearn.model_selection import train_test_split
 import dill
 from sklearn.externals import joblib
+from math import sqrt
 import os.path
 
+base_path = "/home/angelica/Git/osiris/srp/"
 import os
 import sys
-config_path = "utilities/"
+config_path = base_path + "utilities/"
 sys.path.append(os.path.abspath(config_path))
 from MyAPI import MyAPI
 from utilities import concatenate
@@ -36,7 +39,11 @@ import argparse
 parser = argparse.ArgumentParser(description='Train')
 parser.add_argument('-a', '--algorithm', help='algorithm (knn, one-vs-one, one-vs-rest,gaussian-nb,bernoulli-nb,decision-tree,svm,linear-svm,mlp,radius-neighbor,sgd,kernel-approx)',required=False)
 parser.add_argument('-n', '--number', help='number of records',required=True)
+parser.add_argument('-b', '--burst', help='burst size',required=False)
 parser.add_argument('-c', '--cross_validation', action='store_true',help='enable cross validation',required=False)
+parser.add_argument('-p', '--partial_fit',action='store_true',help='enable partial fit',required=False)
+parser.add_argument('-t', '--test_set_size',help='test_set_size',required=False)
+
 args = parser.parse_args()
 
 algorithm = "knn"
@@ -47,7 +54,20 @@ if args.algorithm is not None:
 cv = False
 if args.cross_validation:
     cv = True
+    
+# partial fit
+pf = False
+if args.partial_fit:
+	pf = True
 
+burst = 100
+if args.burst:
+	int(args.burst)
+	
+nr_test = 250000
+if args.test_set_size:
+	nr_test = int(args.test_set_size)
+	
 nr = int(args.number)
 
 classifier = None
@@ -57,7 +77,7 @@ api = MyAPI()
 exists_be_file = None
 ps = api.get_prediction_steps()
 # check whether the cross validation was already run
-be_file_bu = 'data/best-estimator-' + algorithm + '-'
+be_file_bu = base_path + 'data/best-estimator-' + algorithm + '-'
 be_file = be_file_bu + str(ps[0]) + ".pkl"
 exists_be_file = os.path.exists(be_file)
 
@@ -110,7 +130,7 @@ elif algorithm == 'linear-svm':
     if cv:
         parameters = {  'loss'      : ['hinge', 'squared_hinge']}
 elif algorithm == 'mlp':
-    classifier = MLPClassifier(solver='lbfgs', alpha=1e-5,hidden_layer_sizes=(5, 2), random_state=1)
+    #classifier = MLPClassifier(solver='lbfgs', alpha=1e-5,hidden_layer_sizes=(5, 2), random_state=1)
     if cv:
         parameters = {'alpha'   : [1e-5], 
                       'solver'          : ['lbfgs', 'sgd', 'adam'],
@@ -132,36 +152,21 @@ elif algorithm == 'sgd' or algorithm == 'kernel-approx':
                       #'learning_rate'   : ['constant', 'optimal', 'invscaling']
         }
     
-burst = 1000
-# number of records. Calculated offline for performance reasons
-#nr = 430000
-#nr = 4051656 #valore vecchio
-#nr = 7744019
+
 for psi in range(0,len(ps)):
     print ps[psi]
     start_index = 1 
     end_index = start_index + burst
     X = []
     Y = []
+    robust_scaler = RobustScaler()
+    
     while end_index <= nr:
-        #print "start index: " + str(start_index) + " end index: " + str(end_index)
-        #X_train_temp, Y_train_temp = api.get_dataset('true',psi, start_index=start_index,end_index=end_index) # training
-        #X_test_temp, Y_test_temp = api.get_dataset('false',psi,start_index=start_index,end_index=end_index)
-        #print len(X_train_temp[0])
-        #print start_index
-        #print end_index
         X_temp, Y_temp = api.get_dataset(psi, start_index=start_index,end_index=end_index, nr=nr)
         if len(X_temp) > 0:
             X = concatenate(X,X_temp)
-            #print len(X_train[0])
-            #print len(Y_train)
             Y = concatenate(Y,Y_temp)
-            #print len(X_test)
-            #print len(X_test_temp)
-        #X_test = concatenate(X_test,X_test_temp)
-        #print len(Y_train)
-        #Y_test = concatenate(Y_test,Y_test_temp)
-        
+            
         start_index = end_index + 1
         end_index = start_index + burst - 1
         if end_index > nr:
@@ -169,15 +174,20 @@ for psi in range(0,len(ps)):
         if start_index > nr:
             end_index = nr+1
 
-    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.20, random_state=42)
-    #print Y_train
-    #print Y_test
-    #print X_train
-    robust_scaler = RobustScaler()
+	test_size = 0.20
+	if pf is True:
+		test_size = 0.05
+    #X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=test_size, random_state=42)
+    
+    X_test = X[0:nr_test]
+    Y_test = Y[0:nr_test]
+    X_train = X[nr_test+1:len(X)]
+    Y_train = Y[nr_test+1:len(X)]
+     
     X_train = robust_scaler.fit_transform(X_train)
     
     # save standard scaler
-    joblib.dump(robust_scaler, 'data/rs-' + algorithm + '-' + str(ps[psi]) + '.pkl')    
+    joblib.dump(robust_scaler, base_path + 'data/rs-' + algorithm + '-' + str(ps[psi]) + '.pkl')    
     
     X_test = robust_scaler.transform(X_test)
     
@@ -185,6 +195,15 @@ for psi in range(0,len(ps)):
         rbf_feature = RBFSampler(gamma=1, random_state=1)
         X_train = rbf_feature.fit_transform(X_train)
         X_test = rbf_feature.fit_transform(X_test)
+    elif algorithm == 'mlp':
+    	n_output = len(set(Y))
+    	#n_output = 2460
+    	n_input = len(X_train[0]) + 1
+    	n_neurons = int(round(sqrt(n_input*n_output)))
+    	print "N input" , n_input
+    	print "N output" , n_output
+    	print "N neurons", n_neurons
+    	classifier = MLPClassifier(solver='adam', alpha=1e-5,hidden_layer_sizes=(n_input, n_neurons, n_output), random_state=1)
         
     if classifier is not None or exists_be_file is True:
         
@@ -194,29 +213,47 @@ for psi in range(0,len(ps)):
             classifier = gs.best_estimator_
             print(gs.best_estimator_)
             # save best estimator
-            joblib.dump(gs.best_estimator_, 'data/best-estimator-' + algorithm + '-' + str(ps[psi]) + '.pkl')   
+            joblib.dump(gs.best_estimator_, base_path + 'data/best-estimator-' + algorithm + '-' + str(ps[psi]) + '.pkl')   
         elif exists_be_file is True:
             classifier = cv_classifier[psi]
-            
-        classifier.fit(X_train, Y_train)
-        # Classify using k-NN
-        #knn = KNeighborsClassifier(weights='distance',n_neighbors=3)
-        #knn.fit(X_train, Y_train)
-    
+        
+        if pf is True:
+        	classes = []
+        	min_row = 323
+        	max_row = 377
+        	min_col = 99
+        	max_col = 160
+        	for row in range(min_row,max_row+1):
+        		for col in range(min_col,max_col+1):
+        			classes.append(str(row) + "_" + str(col))
+        	nr_training = len(X_train)
+        	train_start = 1
+        	train_stop = burst
+    		while train_stop <= nr_training:
+    			classifier.partial_fit(X_train[train_start:train_stop], Y_train[train_start:train_stop], classes)
+    			train_start = train_stop + 1
+    			train_stop = train_start + burst - 1
+    			if train_stop > nr_training:
+    				train_stop = nr_training
+    			if train_start >= nr_training:
+    				train_stop = nr_training + 1
+    	else:
+        	classifier.fit(X_train, Y_train)
+        
         #save classifier 
-        joblib.dump(classifier, 'data/' + algorithm + '-' + str(ps[psi]) + '.pkl')  
+        joblib.dump(classifier, base_path + 'data/' + algorithm + '-' + str(ps[psi]) + '.pkl')  
     
         # store classes
         ordered_y = sorted(set(Y_train))
         
         
-        joblib.dump(ordered_y, 'data/classes-' + algorithm + '-' + str(ps[psi]) + '.pkl')    
+        joblib.dump(ordered_y, base_path + 'data/classes-' + algorithm + '-' + str(ps[psi]) + '.pkl')    
       
     
         accuracy = classifier.score(X_test, Y_test)
         Y_pred = classifier.predict(X_test)
           
-        out_file = open("data/test-" + algorithm + '-' + str(ps[psi]) + '.txt',"w")
+        out_file = open(base_path + "data/test-" + algorithm + '-' + str(ps[psi]) + '.txt',"w")
         
         out_file.write(str(ps[psi]) + " Precision macro: %1.3f" % precision_score(Y_test, Y_pred,average='macro') + "\n")
         out_file.write(str(ps[psi]) + " Precision micro: %1.3f" % precision_score(Y_test, Y_pred,average='micro') + "\n")
